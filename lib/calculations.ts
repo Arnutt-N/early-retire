@@ -26,6 +26,47 @@ export interface LivelihoodResult {
   rounds: LivelihoodRound[];
 }
 
+/**
+ * Salary base info for one level (mirror of salary-bases.json row, partial fields used by helpers).
+ * Source of truth: data/salary-bases.json
+ */
+export interface SalaryBaseInfo {
+  level: string;
+  fullSalary: number;
+  baseTop: number;
+  baseBottom: number;
+  baseMid: number;
+}
+
+/** Per-row override for the salary calculation table (Phase 3+). */
+export interface SalaryOverride {
+  effectiveDate: string | null;
+  level: string | null;
+}
+
+/**
+ * Look up the salary-base record for a given level. Returns `null` if not found
+ * (e.g. legacy levels with `*` suffix from position-map.json).
+ */
+export function getSalaryBaseForLevel(
+  level: string,
+  salaryBases: SalaryBaseInfo[],
+): SalaryBaseInfo | null {
+  return salaryBases.find((b) => b.level === level) ?? null;
+}
+
+/**
+ * Pick the calculation base for a salary: baseBottom if salary <= baseMid,
+ * otherwise baseTop. Returns 0 if `baseInfo` is null (caller should guard upstream).
+ */
+export function selectBaseForSalary(
+  salary: number,
+  baseInfo: SalaryBaseInfo | null,
+): number {
+  if (!baseInfo) return 0;
+  return salary <= baseInfo.baseMid ? baseInfo.baseBottom : baseInfo.baseTop;
+}
+
 export function calculateRetirementDate(birthDate: Date): Date {
   let retireYear = birthDate.getFullYear() + 60;
   const birthMonth = birthDate.getMonth();
@@ -39,7 +80,11 @@ export function calculateRetirementDate(birthDate: Date): Date {
   return new Date(retireYear, birthMonth, birthDay);
 }
 
-export function calculateServicePeriod(start: Date, end: Date): ServicePeriod {
+export function calculateServicePeriod(
+  start: Date,
+  end: Date,
+  leaveDays: number = 0,
+): ServicePeriod {
   let years = end.getFullYear() - start.getFullYear();
   let months = end.getMonth() - start.getMonth();
   let days = end.getDate() - start.getDate();
@@ -54,7 +99,11 @@ export function calculateServicePeriod(start: Date, end: Date): ServicePeriod {
     months += 12;
   }
 
-  const totalDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const rawTotalDays = Math.floor(
+    (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  const safeLeave = Math.max(0, Math.floor(Number.isFinite(leaveDays) ? leaveDays : 0));
+  const totalDays = Math.max(0, rawTotalDays - safeLeave);
   const totalYears = totalDays / 365.25;
 
   return { years, months, days, totalDays, totalYears };
@@ -152,17 +201,12 @@ export function generateSalaryTable(
   increases: number[],
   endDate: Date,
   mode: "non-gfp" | "gfp",
-  salaryBases: Array<{
-    level: string;
-    fullSalary: number;
-    baseTop: number;
-    baseBottom: number;
-    baseMid: number;
-  }>
+  salaryBases: SalaryBaseInfo[],
+  overrides: SalaryOverride[] = [],
 ): SalaryRecord[] {
   const records: SalaryRecord[] = [];
-  const baseInfo = salaryBases.find((b) => b.level === level);
-  if (!baseInfo) return records;
+  const defaultBaseInfo = getSalaryBaseForLevel(level, salaryBases);
+  if (!defaultBaseInfo) return records;
 
   const avgPercent =
     increases.length > 0
@@ -174,8 +218,6 @@ export function generateSalaryTable(
   const isGfp = mode === "gfp";
   const targetDate = new Date(endDate);
 
-  // For GFP: need 60 months back from end date
-  // For non-GFP: from assessment date to end date
   if (isGfp) {
     const monthsBack = 60;
     currentDate = new Date(targetDate);
@@ -186,12 +228,25 @@ export function generateSalaryTable(
   const maxPeriods = isGfp ? 60 : 100;
 
   while (currentDate <= targetDate && periodCount < maxPeriods) {
+    const override = overrides[periodCount];
+
+    // Per-row level override falls back to default
+    const rowLevel = override?.level ?? level;
+    const rowBaseInfo =
+      rowLevel === level
+        ? defaultBaseInfo
+        : (getSalaryBaseForLevel(rowLevel, salaryBases) ?? defaultBaseInfo);
+
+    // Per-row effective date override falls back to walking computation
+    if (override?.effectiveDate) {
+      currentDate = new Date(override.effectiveDate);
+    }
+
     const nextDate = new Date(currentDate);
     nextDate.setMonth(nextDate.getMonth() + 6);
 
     const percent = periodCount < increases.length ? increases[periodCount] : avgPercent;
-    const useBase =
-      salary <= baseInfo.baseMid ? baseInfo.baseBottom : baseInfo.baseTop;
+    const useBase = selectBaseForSalary(salary, rowBaseInfo);
     const rawIncrease = useBase * (percent / 100);
     const actualIncrease = roundUp10(rawIncrease);
     const newSalary = salary + actualIncrease;
@@ -204,19 +259,19 @@ export function generateSalaryTable(
       periodLabel: `${currentDate.getDate().toString().padStart(2, "0")}/${(
         currentDate.getMonth() + 1
       ).toString().padStart(2, "0")}/${toBE(currentDate.getFullYear())}`,
-      level,
+      level: rowLevel,
       oldSalary: salary,
-      maxSalary: baseInfo.fullSalary,
+      maxSalary: rowBaseInfo.fullSalary,
       base: useBase,
       percent,
       increase: Math.round(rawIncrease * 100) / 100,
       actualIncrease,
-      newSalary: newSalary > baseInfo.fullSalary ? baseInfo.fullSalary : newSalary,
+      newSalary: newSalary > rowBaseInfo.fullSalary ? rowBaseInfo.fullSalary : newSalary,
       isEstimated,
       isCurrent,
     });
 
-    salary = newSalary > baseInfo.fullSalary ? baseInfo.fullSalary : newSalary;
+    salary = newSalary > rowBaseInfo.fullSalary ? rowBaseInfo.fullSalary : newSalary;
     currentDate = nextDate;
     periodCount++;
 

@@ -14,6 +14,13 @@ export interface MultiplierPeriod {
   label?: string;
 }
 
+export interface SalaryOverride {
+  /** ISO date string of the salary effective date for this row, or null to use computed default */
+  effectiveDate: string | null;
+  /** Override level for this row (must match a `level` in salary-bases.json), or null to use form default */
+  level: string | null;
+}
+
 export interface PensionResult {
   monthly: number;
   lumpSum: number;
@@ -36,7 +43,7 @@ export interface LivelihoodResult {
 export interface SalaryRecord {
   period: string; // ISO date
   periodLabel: string;
-  level: number;
+  level: string;
   oldSalary: number;
   maxSalary: number;
   base: number;
@@ -60,15 +67,29 @@ export interface FormState {
   personalLeaveDays: number;
   vacationDays: number;
 
-  // Step 3-4
-  position: string;
-  levelCategory: string;
+  // Step 3-4 — new (redesign)
+  mode: "gfp" | "non-gfp" | null;
+  salaryOverrides: SalaryOverride[];
+
+  // Step 3-4 — legacy (deprecated, removed in Phase 4)
+  /** @deprecated since Phase 1 — removed in Phase 4. Position dropdown is dropped (req #2). */
+  position?: string;
+  /** @deprecated since Phase 1 — removed in Phase 4. Level category radio is dropped. */
+  levelCategory?: string;
   currentSalary: number;
   latestAssessmentDate: string | null;
   assessmentIncreases: number[];
 
-  // View state
-  viewMode: "non-gfp" | "gfp";
+  // View state — legacy (deprecated, removed in Phase 4)
+  /** @deprecated since Phase 1 — removed in Phase 4. Use `mode` (top-level) instead. */
+  viewMode?: "non-gfp" | "gfp";
+
+  // Migration
+  /** Schema version of this saved state. Bump on breaking shape changes; Phase 4 silent-clears localStorage on mismatch. */
+  __schemaVersion: number;
 }
 
 export type RetirementOption = FormState["retirementOption"];
+
+/** Current schema version for FormState. Bump when shape changes incompatibly. Phase 1 sets this to 2 (v1 = pre-redesign). */
+export const FORM_STATE_SCHEMA_VERSION = 2;

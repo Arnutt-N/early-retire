@@ -50,6 +50,10 @@ const initialForm: FormState = {
   latestAssessmentDate: null,
   assessmentIncreases: [0, 0, 0, 0, 0, 0],
   viewMode: "non-gfp",
+  // Phase 1 additions — Phase 4 will own page.tsx fully
+  mode: null,
+  salaryOverrides: [],
+  __schemaVersion: 2,
 };
 
 export default function Home() {
@@ -91,7 +95,8 @@ export default function Home() {
     const pos = positionMap[form.position as keyof typeof positionMap];
     if (!pos) return [];
     const level =
-      (pos as Record<string, string>)[form.levelCategory] || Object.values(pos)[0];
+      (pos as Record<string, string>)[form.levelCategory ?? "general"] ||
+      Object.values(pos)[0];
     const endDate = new Date(form.endDate);
     const assessmentDate = form.latestAssessmentDate
       ? new Date(form.latestAssessmentDate)
@@ -103,7 +108,7 @@ export default function Home() {
       assessmentDate,
       form.assessmentIncreases,
       endDate,
-      form.viewMode,
+      form.viewMode ?? "non-gfp",
       salaryBases as Array<{
         level: string;
         fullSalary: number;
