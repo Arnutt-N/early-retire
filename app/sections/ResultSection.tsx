@@ -10,6 +10,7 @@ import type {
 import { formatNumber, formatThaiDate } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import SocialShare from "@/components/SocialShare";
 import { Award, Calendar, TrendingUp, User, Printer, Info } from "lucide-react";
 
@@ -109,9 +110,10 @@ export default function ResultSection({
               header={<h3 className="font-semibold">เงินบำเหน็จ (ก้อน)</h3>}
             >
               <div className="text-center py-4">
-                <p className="text-4xl font-bold text-[var(--color-primary)]">
-                  {formatNumber(result.lumpSum)}
-                </p>
+                <AnimatedNumber
+                  value={result.lumpSum}
+                  className="text-4xl font-bold text-[var(--color-primary)] block thai-num"
+                />
                 <p className="text-sm text-gray-500 mt-1">บาท</p>
               </div>
               <p className="text-xs text-gray-400 text-center">
@@ -126,9 +128,10 @@ export default function ResultSection({
               header={<h3 className="font-semibold">เงินบำนาญรายเดือน</h3>}
             >
               <div className="text-center py-4">
-                <p className="text-4xl font-bold text-green-700">
-                  {formatNumber(result.monthly)}
-                </p>
+                <AnimatedNumber
+                  value={result.monthly}
+                  className="text-4xl font-bold text-green-700 block thai-num"
+                />
                 <p className="text-sm text-gray-500 mt-1">บาท / เดือน</p>
               </div>
               <p className="text-xs text-gray-400 text-center">{formulaNote}</p>

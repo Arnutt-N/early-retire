@@ -226,3 +226,83 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Print stylesheet (Phase 5) — A4-friendly results export.
+   Hides interactive chrome (header gradient, progress bar, navigation buttons,
+   social share) and expands content for paper. */
+@media print {
+  /* Page setup */
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+
+  body {
+    background: white !important;
+    color: #000 !important;
+    -webkit-font-smoothing: auto;
+  }
+
+  /* Hide chrome that doesn't belong on paper */
+  header,
+  footer,
+  nav,
+  button,
+  [role="dialog"],
+  .no-print {
+    display: none !important;
+  }
+
+  /* Hide the sticky progress bar */
+  .sticky {
+    display: none !important;
+  }
+
+  /* Drop shadows + animations + interactivity decoration */
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Strip gradient backgrounds — print plain colors only */
+  [class*="gradient-mesh"],
+  [style*="gradient"] {
+    background-image: none !important;
+    background-color: white !important;
+    color: #000 !important;
+  }
+
+  /* Expand main container so content uses full printable width */
+  main,
+  .max-w-2xl,
+  .max-w-4xl {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Cards: keep together, drop shadows, lighten borders */
+  [class*="rounded-2xl"] {
+    border: 1px solid #cbd5e0 !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 8mm;
+  }
+
+  /* Hero stat numbers stay readable */
+  .thai-num,
+  [class*="text-4xl"],
+  [class*="text-2xl"] {
+    color: #000 !important;
+  }
+
+  /* Disclaimer remains visible at the bottom of the export */
+  .bg-amber-50 {
+    background-color: #fffbeb !important;
+    border: 1px solid #d69e2e !important;
+  }
+}
