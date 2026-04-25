@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Pension Calculator Smoke Tests', () => {
-  test.use({ reducedMotion: 'reduce' });
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+  });
 
   test('landing page loads with correct title', async ({ page }) => {
     await page.goto('/');
