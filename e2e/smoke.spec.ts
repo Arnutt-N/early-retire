@@ -36,7 +36,7 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.locator('text=ถัดไป').click();
 
     // Step 3: Salary History - select position
-    await page.locator('select, [role="combobox"]').first().selectOption('อาวุโส');
+    await page.locator('select, [role="combobox"]').first().selectOption('เจ้าพนักงานพัสดุ');
     await page.locator('input[type="number"]').first().fill('40000');
     await page.locator('text=ถัดไป').click();
 
@@ -71,7 +71,7 @@ test.describe('Pension Calculator Smoke Tests', () => {
 
     await page.locator('button:has-text("ถัดไป")').click();
     await page.locator('text=ถัดไป').click();
-    await page.locator('select, [role="combobox"]').first().selectOption('อาวุโส');
+    await page.locator('select, [role="combobox"]').first().selectOption('เจ้าพนักงานพัสดุ');
     await page.locator('input[type="number"]').first().fill('40000');
     await page.locator('text=ถัดไป').click();
     await page.locator('text=ถัดไป').click();
