@@ -144,4 +144,30 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.getByRole('radio', { name: /ไม่เป็นสมาชิก กบข\./ }).click();
     await expect(nextBtn).toBeEnabled();
   });
+
+  test('legacy localStorage shape is silently cleared on first load', async ({
+    page,
+  }) => {
+    // Override the beforeEach init script so the legacy state is NOT cleared
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        'early-retire-form',
+        JSON.stringify({
+          // Schema version 1 is the pre-redesign shape
+          __schemaVersion: 1,
+          birthDate: '2000-01-01T00:00:00.000Z',
+          startDate: '2025-01-01T00:00:00.000Z',
+          endDate: '2030-01-01T00:00:00.000Z',
+          mode: 'gfp',
+        }),
+      );
+    });
+    await page.goto('/');
+    // Should land on Step 0 (Mode Select) with no mode selected — saved data discarded
+    await expect(
+      page.getByRole('heading', { name: /คุณเป็นสมาชิก กบข\./ }),
+    ).toBeVisible();
+    // The ถัดไป button must be disabled because no mode is selected (proof saved mode='gfp' was discarded)
+    await expect(page.locator('button:has-text("ถัดไป")')).toBeDisabled();
+  });
 });
