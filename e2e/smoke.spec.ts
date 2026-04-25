@@ -91,11 +91,11 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await expect(page.locator('text=ผลการคำนวณ')).toBeVisible();
 
     // Toggle GFP mode
-    await page.locator('text=เป็นสมาชิก กบข.').click();
+    await page.getByText('เป็นสมาชิก กบข.', { exact: true }).click();
     await expect(page.locator('text=เงินบำนาญรายเดือน')).toBeVisible();
 
     // Toggle back
-    await page.locator('text=ไม่เป็นสมาชิก กบข.').click();
+    await page.getByText('ไม่เป็นสมาชิก กบข.', { exact: true }).click();
     await expect(page.locator('text=เงินบำนาญรายเดือน')).toBeVisible();
   });
 });
