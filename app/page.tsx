@@ -4,21 +4,26 @@ import { useState, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import ProgressBar from "@/components/ProgressBar";
 import Footer from "@/components/Footer";
+import ModeSelect from "./sections/ModeSelect";
 import PersonalInfoForm from "./sections/PersonalInfoForm";
 import ServicePeriodForm from "./sections/ServicePeriodForm";
 import SalaryHistoryForm from "./sections/SalaryHistoryForm";
 import SalaryTableSection from "./sections/SalaryTable";
 import ResultSection from "./sections/ResultSection";
-import { FormState } from "@/types";
+import { FormState, FORM_STATE_SCHEMA_VERSION } from "@/types";
 import {
   calculateServicePeriod,
   calculatePensionNonGfp,
   calculatePensionGfp,
   calculateLivelihood,
   generateSalaryTable,
+  type SalaryBaseInfo,
 } from "@/lib/calculations";
-import salaryBases from "@/data/salary-bases.json";
-import positionMap from "@/data/position-map.json";
+import salaryBasesData from "@/data/salary-bases.json";
+
+const salaryBases = salaryBasesData as SalaryBaseInfo[];
+
+const STORAGE_KEY = "early-retire-form";
 
 const initialForm: FormState = {
   birthDate: null,
@@ -44,59 +49,75 @@ const initialForm: FormState = {
   sickLeaveDays: 0,
   personalLeaveDays: 0,
   vacationDays: 0,
+  mode: null,
+  salaryOverrides: [],
+  defaultLevel: "ปฏิบัติงาน",
   position: "",
   levelCategory: "general",
   currentSalary: 0,
   latestAssessmentDate: null,
   assessmentIncreases: [0, 0, 0, 0, 0, 0],
   viewMode: "non-gfp",
-  // Phase 1 additions — Phase 4 will own page.tsx fully
-  mode: null,
-  salaryOverrides: [],
-  __schemaVersion: 2,
+  __schemaVersion: FORM_STATE_SCHEMA_VERSION,
 };
 
-export default function Home() {
-  const [form, setForm] = useState<FormState>(() => {
-    if (typeof window === "undefined") return initialForm;
-    try {
-      const saved = localStorage.getItem("early-retire-form");
-      return saved ? { ...initialForm, ...JSON.parse(saved) } : initialForm;
-    } catch {
+function loadInitialForm(): FormState {
+  if (typeof window === "undefined") return initialForm;
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (!saved) return initialForm;
+    const parsed = JSON.parse(saved) as Partial<FormState>;
+    // Schema mismatch → silent clear
+    if (parsed.__schemaVersion !== FORM_STATE_SCHEMA_VERSION) {
+      window.localStorage.removeItem(STORAGE_KEY);
       return initialForm;
     }
-  });
+    return { ...initialForm, ...parsed };
+  } catch {
+    return initialForm;
+  }
+}
+
+export default function Home() {
+  const [form, setForm] = useState<FormState>(loadInitialForm);
   const [step, setStep] = useState(0);
 
   const updateForm = (updates: Partial<FormState>) => {
     setForm((prev) => {
-      const next = { ...prev, ...updates };
+      const next: FormState = {
+        ...prev,
+        ...updates,
+        __schemaVersion: FORM_STATE_SCHEMA_VERSION,
+      };
       try {
-        localStorage.setItem("early-retire-form", JSON.stringify(next));
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        }
       } catch {
-        // ignore
+        // ignore quota errors
       }
       return next;
     });
   };
 
+  const totalLeaveDays =
+    (form.sickLeaveDays || 0) +
+    (form.personalLeaveDays || 0) +
+    (form.vacationDays || 0);
+
   const servicePeriod = useMemo(() => {
     if (!form.startDate || !form.endDate) return null;
-    return calculateServicePeriod(new Date(form.startDate), new Date(form.endDate));
-  }, [form.startDate, form.endDate]);
+    return calculateServicePeriod(
+      new Date(form.startDate),
+      new Date(form.endDate),
+      totalLeaveDays,
+    );
+  }, [form.startDate, form.endDate, totalLeaveDays]);
 
-  const totalServiceYears = useMemo(() => {
-    if (!servicePeriod) return 0;
-    return servicePeriod.totalYears;
-  }, [servicePeriod]);
+  const totalServiceYears = servicePeriod?.totalYears ?? 0;
 
   const salaryRecords = useMemo(() => {
-    if (!form.position || !form.currentSalary || !form.endDate) return [];
-    const pos = positionMap[form.position as keyof typeof positionMap];
-    if (!pos) return [];
-    const level =
-      (pos as Record<string, string>)[form.levelCategory ?? "general"] ||
-      Object.values(pos)[0];
+    if (!form.currentSalary || !form.endDate || !form.mode) return [];
     const endDate = new Date(form.endDate);
     const assessmentDate = form.latestAssessmentDate
       ? new Date(form.latestAssessmentDate)
@@ -104,20 +125,23 @@ export default function Home() {
 
     return generateSalaryTable(
       form.currentSalary,
-      level,
+      form.defaultLevel,
       assessmentDate,
       form.assessmentIncreases,
       endDate,
-      form.viewMode ?? "non-gfp",
-      salaryBases as Array<{
-        level: string;
-        fullSalary: number;
-        baseTop: number;
-        baseBottom: number;
-        baseMid: number;
-      }>
+      form.mode,
+      salaryBases,
+      form.salaryOverrides,
     );
-  }, [form]);
+  }, [
+    form.currentSalary,
+    form.endDate,
+    form.latestAssessmentDate,
+    form.mode,
+    form.defaultLevel,
+    form.assessmentIncreases,
+    form.salaryOverrides,
+  ]);
 
   const lastSalary = useMemo(() => {
     if (salaryRecords.length === 0) return form.currentSalary;
@@ -130,67 +154,71 @@ export default function Home() {
     return total / salaryRecords.length;
   }, [salaryRecords]);
 
-  const nonGfpResult = useMemo(() => {
-    if (totalServiceYears <= 0) return null;
-    return calculatePensionNonGfp(lastSalary, totalServiceYears);
-  }, [lastSalary, totalServiceYears]);
-
-  const gfpResult = useMemo(() => {
-    if (totalServiceYears <= 0) return null;
+  const result = useMemo(() => {
+    if (!form.mode || totalServiceYears <= 0) return null;
+    if (form.mode === "non-gfp") {
+      return calculatePensionNonGfp(lastSalary, totalServiceYears);
+    }
     return calculatePensionGfp(avg60Months, totalServiceYears);
-  }, [avg60Months, totalServiceYears]);
+  }, [form.mode, lastSalary, avg60Months, totalServiceYears]);
 
-  const nonGfpLivelihood = useMemo(() => {
-    if (!nonGfpResult) return null;
-    return calculateLivelihood(nonGfpResult.monthly, "non-gfp");
-  }, [nonGfpResult]);
+  const livelihood = useMemo(() => {
+    if (!result || !form.mode) return null;
+    return calculateLivelihood(result.monthly, form.mode);
+  }, [result, form.mode]);
 
-  const gfpLivelihood = useMemo(() => {
-    if (!gfpResult) return null;
-    return calculateLivelihood(gfpResult.monthly, "gfp");
-  }, [gfpResult]);
+  const goNext = () => setStep((s) => Math.min(s + 1, 5));
+  const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
   const steps = [
-    <PersonalInfoForm key="1" form={form} updateForm={updateForm} onNext={() => setStep(1)} />,
+    <ModeSelect key="0" form={form} updateForm={updateForm} onNext={goNext} />,
+    <PersonalInfoForm
+      key="1"
+      form={form}
+      updateForm={updateForm}
+      onNext={goNext}
+    />,
     <ServicePeriodForm
       key="2"
       form={form}
       updateForm={updateForm}
-      onNext={() => setStep(2)}
-      onBack={() => setStep(0)}
+      onNext={goNext}
+      onBack={goBack}
     />,
     <SalaryHistoryForm
       key="3"
       form={form}
       updateForm={updateForm}
-      onNext={() => setStep(3)}
-      onBack={() => setStep(1)}
+      onNext={goNext}
+      onBack={goBack}
     />,
     <SalaryTableSection
       key="4"
+      form={form}
+      updateForm={updateForm}
       records={salaryRecords}
-      onNext={() => setStep(4)}
-      onBack={() => setStep(2)}
+      salaryBases={salaryBases}
+      onNext={goNext}
+      onBack={goBack}
     />,
     <ResultSection
       key="5"
+      mode={form.mode}
       birthDate={form.birthDate}
       startDate={form.startDate}
       endDate={form.endDate}
       servicePeriod={servicePeriod}
-      nonGfpResult={nonGfpResult}
-      gfpResult={gfpResult}
-      nonGfpLivelihood={nonGfpLivelihood}
-      gfpLivelihood={gfpLivelihood}
+      result={result}
+      livelihood={livelihood}
       salaryRecords={salaryRecords}
-      onBack={() => setStep(3)}
+      onBack={goBack}
     />,
   ];
 
   return (
     <main className="min-h-screen flex flex-col bg-[var(--background)]">
-      <header className="bg-[var(--primary)] text-white py-6">
-        <div className="max-w-4xl mx-auto px-4">
+      <header className="bg-[image:var(--gradient-mesh-primary)] text-white py-6 shadow-[var(--shadow-e2)]">
+        <div className="max-w-2xl mx-auto px-4">
           <h1 className="text-2xl md:text-3xl font-bold">คำนวณบำเหน็จบำนาญ</h1>
           <p className="text-blue-100 mt-1 text-sm md:text-base">
             กองบริหารทรัพยากรบุคคล สำนักงานปลัดกระทรวงยุติธรรม
@@ -198,20 +226,20 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-[var(--shadow-e1)]">
+        <div className="max-w-2xl mx-auto px-4 py-4">
           <ProgressBar currentStep={step} />
         </div>
       </div>
 
-      <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-6">
+      <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={step}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
           >
             {steps[step]}
           </motion.div>

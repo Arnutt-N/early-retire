@@ -42,6 +42,7 @@ export interface SalaryBaseInfo {
 export interface SalaryOverride {
   effectiveDate: string | null;
   level: string | null;
+  percent: number | null;
 }
 
 /**
@@ -245,7 +246,9 @@ export function generateSalaryTable(
     const nextDate = new Date(currentDate);
     nextDate.setMonth(nextDate.getMonth() + 6);
 
-    const percent = periodCount < increases.length ? increases[periodCount] : avgPercent;
+    const computedPercent =
+      periodCount < increases.length ? increases[periodCount] : avgPercent;
+    const percent = override?.percent ?? computedPercent;
     const useBase = selectBaseForSalary(salary, rowBaseInfo);
     const rawIncrease = useBase * (percent / 100);
     const actualIncrease = roundUp10(rawIncrease);

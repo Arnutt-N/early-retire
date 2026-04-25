@@ -3,64 +3,95 @@ import { test, expect } from '@playwright/test';
 test.describe('Pension Calculator Smoke Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    // Ensure a clean slate — wizard remembers state via localStorage between tests
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.removeItem('early-retire-form');
+      } catch {
+        // ignore
+      }
+    });
   });
 
-  test('landing page loads with correct title', async ({ page }) => {
+  test('landing page loads with correct title and Step 0', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/คำนวณบำเหน็จบำนาญ/);
-    await expect(page.locator('text=คำนวณบำเหน็จบำนาญ')).toBeVisible();
+    await expect(page.locator('h1')).toContainText('คำนวณบำเหน็จบำนาญ');
+    // Step 0 = Mode Select
+    await expect(
+      page.getByRole('heading', { name: /คุณเป็นสมาชิก กบข\. หรือไม่/ }),
+    ).toBeVisible();
   });
 
-  test('completes full wizard flow and shows results', async ({ page }) => {
+  test('completes full 6-step wizard flow and shows results (non-gfp)', async ({
+    page,
+  }) => {
     await page.goto('/');
 
-    // Step 1: Personal Info (3 date pickers on page)
+    // Step 0: Mode Select — pick non-gfp
+    await page.getByRole('radio', { name: /ไม่เป็นสมาชิก กบข\./ }).click();
+    await page.locator('button:has-text("ถัดไป")').click();
+    await page.waitForTimeout(400);
+
+    // Step 1: Personal Info (3 date pickers always visible)
     const dayInputs = page.locator('[placeholder="วว"]');
     const monthInputs = page.locator('[placeholder="ดด"]');
     const yearInputs = page.locator('[placeholder="ปปปป (พ.ศ.)"]');
 
-    // Birth date (index 0)
+    // Birth date
     await dayInputs.nth(0).fill('15');
     await monthInputs.nth(0).fill('05');
     await yearInputs.nth(0).fill('2500');
 
-    // Start date (index 1)
+    // Start date
     await dayInputs.nth(1).fill('01');
     await monthInputs.nth(1).fill('10');
-    await yearInputs.nth(1).fill('2560');
+    await yearInputs.nth(1).fill('2540');
 
-    // End date (index 2) - fill directly instead of using retirement option
+    // End date (custom)
     await dayInputs.nth(2).fill('01');
     await monthInputs.nth(2).fill('10');
-    await yearInputs.nth(2).fill('2565');
+    await yearInputs.nth(2).fill('2570');
 
     await page.locator('button:has-text("ถัดไป")').click();
+    await page.waitForTimeout(400);
+
+    // Step 2: Service Period (skip — defaults are fine)
+    await page.locator('button:has-text("ถัดไป")').click();
+    await page.waitForTimeout(400);
+
+    // Step 3: Salary History (currentSalary)
+    await page
+      .locator('input[type="number"]')
+      .first()
+      .fill('40000');
+    await page.locator('button:has-text("ถัดไป")').click();
+    await page.waitForTimeout(400);
+
+    // Step 4: การคำนวณ (table) — proceed without edits
+    await page.locator('button:has-text("ดูผลลัพธ์")').click();
     await page.waitForTimeout(500);
 
-    // Step 2: Service Period
-    await page.locator('text=ถัดไป').click();
-    await page.waitForTimeout(500);
-
-    // Step 3: Salary History - select position
-    await page.locator('select, [role="combobox"]').first().selectOption('เจ้าพนักงานพัสดุ');
-    await page.locator('input[type="number"]').first().fill('40000');
-    await page.locator('text=ถัดไป').click();
-    await page.waitForTimeout(500);
-
-    // Step 4: Salary Table
-    await page.locator('text=ดูผลลัพธ์').click();
-    await page.waitForTimeout(500);
-
-    // Step 5: Results
-    await expect(page.locator('text=ผลการคำนวณ')).toBeVisible();
+    // Step 5: Results — assert all 3 amounts shown
+    await expect(page.getByRole('heading', { name: 'ผลการคำนวณ' })).toBeVisible();
     await expect(page.locator('text=เงินบำเหน็จ')).toBeVisible();
     await expect(page.locator('text=เงินบำนาญรายเดือน')).toBeVisible();
+    await expect(page.locator('text=บำเหน็จดำรงชีพ')).toBeVisible();
+    // Disclaimer present
+    await expect(page.locator('text=ประมาณการเบื้องต้น')).toBeVisible();
   });
 
-  test('can toggle between non-gfp and gfp results', async ({ page }) => {
+  test('completes full 6-step wizard flow and shows results (gfp)', async ({
+    page,
+  }) => {
     await page.goto('/');
 
-    // Fill required fields to reach results
+    // Step 0: Mode Select — pick gfp
+    await page.getByRole('radio', { name: /^เป็นสมาชิก กบข\./ }).click();
+    await page.locator('button:has-text("ถัดไป")').click();
+    await page.waitForTimeout(400);
+
+    // Step 1
     const dayInputs = page.locator('[placeholder="วว"]');
     const monthInputs = page.locator('[placeholder="ดด"]');
     const yearInputs = page.locator('[placeholder="ปปปป (พ.ศ.)"]');
@@ -71,31 +102,46 @@ test.describe('Pension Calculator Smoke Tests', () => {
 
     await dayInputs.nth(1).fill('01');
     await monthInputs.nth(1).fill('10');
-    await yearInputs.nth(1).fill('2560');
+    await yearInputs.nth(1).fill('2540');
 
     await dayInputs.nth(2).fill('01');
     await monthInputs.nth(2).fill('10');
-    await yearInputs.nth(2).fill('2565');
+    await yearInputs.nth(2).fill('2570');
 
     await page.locator('button:has-text("ถัดไป")').click();
-    await page.waitForTimeout(500);
-    await page.locator('text=ถัดไป').click();
-    await page.waitForTimeout(500);
-    await page.locator('select, [role="combobox"]').first().selectOption('เจ้าพนักงานพัสดุ');
-    await page.locator('input[type="number"]').first().fill('40000');
-    await page.locator('text=ถัดไป').click();
-    await page.waitForTimeout(500);
-    await page.locator('text=ดูผลลัพธ์').click();
+    await page.waitForTimeout(400);
+
+    // Step 2
+    await page.locator('button:has-text("ถัดไป")').click();
+    await page.waitForTimeout(400);
+
+    // Step 3
+    await page
+      .locator('input[type="number"]')
+      .first()
+      .fill('40000');
+    await page.locator('button:has-text("ถัดไป")').click();
+    await page.waitForTimeout(400);
+
+    // Step 4
+    await page.locator('button:has-text("ดูผลลัพธ์")').click();
     await page.waitForTimeout(500);
 
-    await expect(page.locator('text=ผลการคำนวณ')).toBeVisible();
-
-    // Toggle GFP mode
-    await page.getByText('เป็นสมาชิก กบข.', { exact: true }).click();
+    // Step 5 — gfp shows the same 3 amounts (computed differently)
+    await expect(page.getByRole('heading', { name: 'ผลการคำนวณ' })).toBeVisible();
+    await expect(page.locator('text=เงินบำเหน็จ')).toBeVisible();
     await expect(page.locator('text=เงินบำนาญรายเดือน')).toBeVisible();
+    await expect(page.locator('text=บำเหน็จดำรงชีพ')).toBeVisible();
+  });
 
-    // Toggle back
-    await page.getByText('ไม่เป็นสมาชิก กบข.', { exact: true }).click();
-    await expect(page.locator('text=เงินบำนาญรายเดือน')).toBeVisible();
+  test('mode selection gates progression', async ({ page }) => {
+    await page.goto('/');
+    // Without picking a mode, the ถัดไป button should be disabled
+    const nextBtn = page.locator('button:has-text("ถัดไป")');
+    await expect(nextBtn).toBeDisabled();
+
+    // After picking, it enables
+    await page.getByRole('radio', { name: /ไม่เป็นสมาชิก กบข\./ }).click();
+    await expect(nextBtn).toBeEnabled();
   });
 });
