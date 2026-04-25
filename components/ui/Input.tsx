@@ -1,6 +1,7 @@
 "use client";
 
-import { ReactNode } from "react";
+import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 
 interface InputProps {
   label?: string;
@@ -16,6 +17,7 @@ interface InputProps {
   min?: number;
   max?: number;
   step?: number;
+  className?: string;
 }
 
 export default function Input({
@@ -32,13 +34,14 @@ export default function Input({
   min,
   max,
   step,
+  className,
 }: InputProps) {
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-[var(--text)] mb-1.5">
+        <label className="block text-sm font-medium mb-1.5">
           {label}
-          {required && <span className="text-[var(--danger)] ml-1">*</span>}
+          {required && <span className="text-[var(--color-accent)] ml-1">*</span>}
         </label>
       )}
       <div className="relative">
@@ -51,14 +54,25 @@ export default function Input({
           min={min}
           max={max}
           step={step}
-          className={`w-full px-4 py-2.5 rounded-xl border-2 bg-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary-light)] disabled:bg-gray-100 disabled:text-gray-400 ${error ? "border-[var(--danger)]" : "border-gray-200 hover:border-gray-300 focus:border-[var(--primary)]"} ${suffix ? "pr-12" : ""}`}
+          className={cn(
+            "w-full px-4 py-3 min-h-[44px] rounded-xl border-2 bg-white transition-colors duration-[var(--duration-fast)]",
+            "focus:outline-none focus:border-[var(--color-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-primary-light)]",
+            "disabled:bg-gray-100 disabled:text-gray-400",
+            error
+              ? "border-[var(--color-accent)]"
+              : "border-gray-200 hover:border-gray-300",
+            suffix && "pr-12",
+            className,
+          )}
         />
         {suffix && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{suffix}</div>
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">
+            {suffix}
+          </span>
         )}
       </div>
-      {error && <p className="mt-1 text-sm text-[var(--danger)]">{error}</p>}
-      {helper && !error && <p className="mt-1 text-sm text-[var(--text-muted)]">{helper}</p>}
+      {error && <p className="mt-1 text-sm text-[var(--color-accent)]">{error}</p>}
+      {helper && !error && <p className="mt-1 text-sm text-gray-500">{helper}</p>}
     </div>
   );
 }
