@@ -595,7 +595,7 @@ Explicit out-of-scope for Phase 1 (handled by other phases):
 - **MIRROR**: `CSS_TOKEN_PATTERN` (declare on `:root`, re-expose in `@theme inline`), `KEYFRAME_AND_UTILITY_PATTERN` (existing `.animate-*` class names — referenced verbatim in reduced-motion override)
 - **IMPORTS**: None — pure CSS
 - **GOTCHA**:
-  - **Tailwind v4 quirk**: Tokens declared in `:root` ONLY become CSS variables; tokens **also** declared in `@theme inline` are exposed as **utility prefixes** (e.g., `bg-gradient-mesh-primary`, `ease-out-expo`, `shadow-e2`, `duration-fast`). Both are required if you want both `var(...)` AND utility-class access
+  - **Tailwind v4 quirk**: Tokens declared in `:root` ONLY become CSS variables; tokens **also** declared in `@theme inline` are exposed as **utility prefixes** (e.g., `bg-gradient-mesh-primary`, `ease-out-expo`, `shadow-e2`, `duration-fast`). Both are required if you want both raw `var(--token)` access AND utility-class access
   - The `@media (prefers-reduced-motion: reduce)` override uses `!important` because `animate-*` classes have lower specificity. Without `!important`, the original `0.4s ease-out` wins
   - **Don't** use `animation: none` — that resets to no-keyframes, jumping the element back to its initial state and breaking layouts. Use `animation-duration: 0.01ms` so the keyframe completes instantly at the final state
   - The wildcard `*, *::before, *::after` rule is intentional — covers Framer Motion CSS-injected animations + any `transition` property. WCAG 2.3.3 compliance requires this breadth

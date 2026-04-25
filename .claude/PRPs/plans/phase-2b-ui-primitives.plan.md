@@ -230,7 +230,7 @@ import { motion } from "framer-motion";
 - **MIRROR**: `EXISTING_BUTTON_VARIANT_API` (preserve all existing props), `MOTION_BUTTON_PRESS`, `TOKEN_CONSUMPTION_TAILWIND_V4`
 - **IMPORTS**: `framer-motion`, `@/lib/utils`, `react` types
 - **GOTCHA**:
-  - **Tailwind v4 gradient as background**: Tailwind doesn't have a `bg-gradient-mesh-primary` utility for `linear-gradient` values declared in `@theme inline`. Use **arbitrary `bg-[image:var(...)]`** syntax: `bg-[image:var(--gradient-mesh-primary)]` — the `image:` prefix tells Tailwind it's a `background-image` not `background-color`
+  - **Tailwind v4 gradient as background**: Tailwind doesn't have a `bg-gradient-mesh-primary` utility for `linear-gradient` values declared in `@theme inline`. Use **arbitrary `bg-[image:var(--your-token)]`** syntax: `bg-[image:var(--gradient-mesh-primary)]` — the `image:` prefix tells Tailwind it's a `background-image` not `background-color`
   - **Type for HTMLMotionProps**: Framer's `HTMLMotionProps<"button">` is the correct base; omit `children` because we re-declare with `ReactNode` for clarity
   - **`whileTap={undefined}` when disabled** — explicit undefined disables the hover/tap animations on disabled state
   - **`focus-visible` not `focus`** — keyboard-only ring; mouse clicks don't show ring
@@ -666,7 +666,7 @@ npm run dev   # visual check
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Tailwind v4 doesn't generate utility for `bg-[image:var(--gradient-mesh-primary)]` | L | Gradient doesn't render | Use arbitrary syntax `bg-[image:var(...)]` — works for any CSS variable. If still broken, fall back to inline `style={{ backgroundImage: "var(--gradient-mesh-primary)" }}` |
+| Tailwind v4 doesn't generate utility for `bg-[image:var(--gradient-mesh-primary)]` | L | Gradient doesn't render | Use arbitrary syntax `bg-[image:var(--your-token)]` — works for any CSS variable. If still broken, fall back to inline `style={{ backgroundImage: "var(--gradient-mesh-primary)" }}` |
 | `ProgressBar` 6 labels overflow on narrow desktop | L | Text crowding | `flex-1` + `whitespace-nowrap` + `text-xs`; if still tight, drop to `text-[11px]` at md breakpoint |
 | `SegmentedControl` generic causes inference issues | L | Type errors at call sites | Test with explicit type param: `<SegmentedControl<"gfp" \| "non-gfp">>`. Most call sites infer correctly |
 | `Button` `whileHover={{ y: -1 }}` causes layout shift in tight grids | L | Visual jump | -1px is below `font-size`, generally invisible; if ProgressBar dots jump, add `relative` + `transform: translateZ(0)` to parent |
