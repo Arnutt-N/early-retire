@@ -19,6 +19,8 @@ export interface SalaryOverride {
   effectiveDate: string | null;
   /** Override level for this row (must match a `level` in salary-bases.json), or null to use form default */
   level: string | null;
+  /** Override % increase for this row (used for future/estimated rounds), or null to use computed default */
+  percent: number | null;
 }
 
 export interface PensionResult {
@@ -70,6 +72,8 @@ export interface FormState {
   // Step 3-4 — new (redesign)
   mode: "gfp" | "non-gfp" | null;
   salaryOverrides: SalaryOverride[];
+  /** Default level for the salary table; user picks once at the top, can override per-row. */
+  defaultLevel: string;
 
   // Step 3-4 — legacy (deprecated, removed in Phase 4)
   /** @deprecated since Phase 1 — removed in Phase 4. Position dropdown is dropped (req #2). */

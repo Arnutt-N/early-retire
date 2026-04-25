@@ -2,9 +2,10 @@
 
 import { motion } from "framer-motion";
 import { calculateServicePeriod } from "@/lib/calculations";
-import { FormState } from "@/types";
+import type { FormState } from "@/types";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import CalendarPickerTH from "@/components/ui/CalendarPickerTH";
 import { Clock, Plus, Trash2 } from "lucide-react";
 
 interface Props {
@@ -17,7 +18,23 @@ interface Props {
 export default function ServicePeriodForm({ form, updateForm, onNext, onBack }: Props) {
   const start = form.startDate ? new Date(form.startDate) : null;
   const end = form.endDate ? new Date(form.endDate) : null;
-  const basePeriod = start && end ? calculateServicePeriod(start, end) : null;
+  const leaveDays =
+    (form.sickLeaveDays || 0) +
+    (form.personalLeaveDays || 0) +
+    (form.vacationDays || 0);
+  const basePeriod = start && end ? calculateServicePeriod(start, end, leaveDays) : null;
+
+  // Visibility: hide default multiplier periods if user's startDate is AFTER the period's start.
+  // Per requirement #5/#6: if startDate is before/within an auto-multiplier window, show it
+  // (with leave deduction); if startDate is after all auto windows, only user-added rows show.
+  const visiblePeriods = form.multiplierPeriods.filter((p) => {
+    const isDefault = p.id?.startsWith("default-");
+    if (!isDefault) return true; // user-added — always show
+    if (!form.startDate) return true; // no start yet — show all defaults
+    const startD = new Date(form.startDate);
+    const periodEnd = new Date(p.endDate);
+    return startD <= periodEnd; // show if user started on or before the period ended
+  });
 
   const addMultiplier = () => {
     const newPeriods = [
@@ -27,14 +44,19 @@ export default function ServicePeriodForm({ form, updateForm, onNext, onBack }: 
     updateForm({ multiplierPeriods: newPeriods });
   };
 
-  const removeMultiplier = (index: number) => {
-    const newPeriods = form.multiplierPeriods.filter((_, i) => i !== index);
+  const removeMultiplier = (period: typeof form.multiplierPeriods[number]) => {
+    const newPeriods = form.multiplierPeriods.filter((p) => p !== period);
     updateForm({ multiplierPeriods: newPeriods });
   };
 
-  const updateMultiplier = (index: number, field: string, value: string | number) => {
-    const newPeriods = [...form.multiplierPeriods];
-    newPeriods[index] = { ...newPeriods[index], [field]: value };
+  const updateMultiplier = (
+    period: typeof form.multiplierPeriods[number],
+    field: "startDate" | "endDate" | "multiplier",
+    value: string | number,
+  ) => {
+    const newPeriods = form.multiplierPeriods.map((p) =>
+      p === period ? { ...p, [field]: value } : p,
+    );
     updateForm({ multiplierPeriods: newPeriods });
   };
 
@@ -46,18 +68,20 @@ export default function ServicePeriodForm({ form, updateForm, onNext, onBack }: 
       className="space-y-6"
     >
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-full bg-[var(--primary)] text-white flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center">
           <Clock size={20} />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-[var(--text)]">เวลาราชการ</h2>
-          <p className="text-sm text-[var(--text-muted)]">ตรวจสอบและเพิ่มช่วงเวลาราชการทวีคูณ</p>
+          <h2 className="text-xl font-bold">เวลาราชการ</h2>
+          <p className="text-sm text-gray-500">
+            ตรวจสอบเวลาราชการ + เพิ่มช่วงทวีคูณและหักวันลา
+          </p>
         </div>
       </div>
 
       {basePeriod && (
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-          <h3 className="font-semibold text-blue-900 mb-2">อายุราชการพื้นฐาน</h3>
+          <h3 className="font-semibold text-blue-900 mb-2">อายุราชการ (หลังหักวันลา)</h3>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <p className="text-2xl font-bold text-blue-700">{basePeriod.years}</p>
@@ -73,56 +97,69 @@ export default function ServicePeriodForm({ form, updateForm, onNext, onBack }: 
             </div>
           </div>
           <p className="text-xs text-blue-500 mt-2 text-center">
-            รวม {basePeriod.totalYears.toFixed(2)} ปี ({basePeriod.totalDays} วัน)
+            รวม {basePeriod.totalYears.toFixed(2)} ปี ({basePeriod.totalDays} วัน
+            {leaveDays > 0 && `, หักวันลา ${leaveDays} วัน`})
           </p>
         </div>
       )}
 
       <div className="space-y-3">
-        <h3 className="font-semibold text-[var(--text)]">เวลาราชการทวีคูณ</h3>
-        {form.multiplierPeriods.map((period, index) => (
-          <div key={period.id || index} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="font-medium text-sm">ช่วงที่ {index + 1}</p>
-              <button
-                onClick={() => removeMultiplier(index)}
-                className="text-red-500 hover:text-red-700 p-1"
-              >
-                <Trash2 size={16} />
-              </button>
+        <h3 className="font-semibold">เวลาราชการทวีคูณ</h3>
+        {visiblePeriods.length === 0 ? (
+          <p className="text-sm text-gray-500 italic">
+            ไม่มีช่วงเวลาทวีคูณ — สามารถเพิ่มได้ด้านล่าง
+          </p>
+        ) : (
+          visiblePeriods.map((period) => (
+            <div
+              key={period.id || period.startDate}
+              className="bg-white border border-gray-200 rounded-xl p-4 space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <p className="font-medium text-sm">
+                  {period.label || `ช่วงที่กำหนดเอง`}
+                </p>
+                {!period.id?.startsWith("default-") && (
+                  <button
+                    type="button"
+                    onClick={() => removeMultiplier(period)}
+                    aria-label="ลบช่วงนี้"
+                    className="text-red-500 hover:text-red-700 p-1"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <CalendarPickerTH
+                  label="วันเริ่มต้น"
+                  value={period.startDate || null}
+                  onChange={(d) => updateMultiplier(period, "startDate", d || "")}
+                />
+                <CalendarPickerTH
+                  label="วันสิ้นสุด"
+                  value={period.endDate || null}
+                  onChange={(d) => updateMultiplier(period, "endDate", d || "")}
+                />
+                <Input
+                  label="ตัวคูณ"
+                  value={period.multiplier}
+                  onChange={(v) => updateMultiplier(period, "multiplier", parseFloat(v) || 0)}
+                  type="number"
+                  step={0.1}
+                  suffix="เท่า"
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Input
-                label="วันเริ่มต้น"
-                value={period.startDate}
-                onChange={(v) => updateMultiplier(index, "startDate", v)}
-                type="date"
-              />
-              <Input
-                label="วันสิ้นสุด"
-                value={period.endDate}
-                onChange={(v) => updateMultiplier(index, "endDate", v)}
-                type="date"
-              />
-              <Input
-                label="ตัวคูณ"
-                value={period.multiplier}
-                onChange={(v) => updateMultiplier(index, "multiplier", parseFloat(v) || 0)}
-                type="number"
-                step={0.1}
-                suffix="เท่า"
-              />
-            </div>
-            {period.label && <p className="text-xs text-gray-500">{period.label}</p>}
-          </div>
-        ))}
+          ))
+        )}
         <Button variant="outline" size="sm" onClick={addMultiplier} icon={<Plus size={16} />}>
           เพิ่มช่วงทวีคูณ
         </Button>
       </div>
 
       <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-        <h3 className="font-semibold text-[var(--text)]">หักวันลา</h3>
+        <h3 className="font-semibold">หักวันลา (จะลบจากอายุราชการรวม)</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Input
             label="ลาป่วย (วัน)"

@@ -44,3 +44,6 @@ next-env.d.ts
 
 # shell crash artifacts (Windows bash)
 *.stackdump
+
+# editor backups
+*.bak
