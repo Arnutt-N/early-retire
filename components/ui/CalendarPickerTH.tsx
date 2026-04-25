@@ -70,16 +70,23 @@ export default function CalendarPickerTH({
   const [isOpen, setIsOpen] = useState(false);
   const [localError, setLocalError] = useState<string>("");
 
-  const [viewMonth, setViewMonth] = useState<Date>(() => {
+  // viewMonth follows `value` by default; user calendar-nav sets an override.
+  // Day pick / keyboard validation success clears the override so it tracks `value` again.
+  // This avoids `setState` inside `useEffect` (react-hooks/set-state-in-effect rule).
+  const [viewMonthOverride, setViewMonthOverride] = useState<Date | null>(null);
+
+  const viewMonth = useMemo<Date>(() => {
+    if (viewMonthOverride) return viewMonthOverride;
     if (value) {
       const d = new Date(value);
       if (!isNaN(d.getTime())) return firstOfMonth(d.getFullYear(), d.getMonth());
     }
     const now = new Date();
     return firstOfMonth(now.getFullYear(), now.getMonth());
-  });
+  }, [viewMonthOverride, value]);
 
-  // Sync external value into DOM refs (covers retirement-option auto-fill + calendar pick)
+  // DOM-ref sync: when `value` changes externally (retirement-option auto-fill, calendar pick),
+  // mirror it into the keyboard input refs. Pure DOM mutation — no setState here.
   useEffect(() => {
     const parts = partsFrom(value);
     if (dayRef.current && dayRef.current.value !== parts.day) {
@@ -90,13 +97,6 @@ export default function CalendarPickerTH({
     }
     if (yearRef.current && yearRef.current.value !== parts.beYear) {
       yearRef.current.value = parts.beYear;
-    }
-
-    if (value) {
-      const d = new Date(value);
-      if (!isNaN(d.getTime())) {
-        setViewMonth(firstOfMonth(d.getFullYear(), d.getMonth()));
-      }
     }
   }, [value]);
 
@@ -120,6 +120,7 @@ export default function CalendarPickerTH({
 
     if (!day && !month && !beYear) {
       onChange(null);
+      setViewMonthOverride(null);
       return;
     }
     if (!day || !month || !beYear) return;
@@ -153,6 +154,7 @@ export default function CalendarPickerTH({
         return;
       }
       onChange(date.toISOString());
+      setViewMonthOverride(null);
     } catch {
       setLocalError("วันที่ไม่ถูกต้อง");
     }
@@ -169,22 +171,22 @@ export default function CalendarPickerTH({
   const goPrevMonth = () => {
     const next = new Date(viewMonth);
     next.setMonth(next.getMonth() - 1);
-    setViewMonth(next);
+    setViewMonthOverride(next);
   };
   const goNextMonth = () => {
     const next = new Date(viewMonth);
     next.setMonth(next.getMonth() + 1);
-    setViewMonth(next);
+    setViewMonthOverride(next);
   };
   const goPrevYear = () => {
     const next = new Date(viewMonth);
     next.setFullYear(next.getFullYear() - 1);
-    setViewMonth(next);
+    setViewMonthOverride(next);
   };
   const goNextYear = () => {
     const next = new Date(viewMonth);
     next.setFullYear(next.getFullYear() + 1);
-    setViewMonth(next);
+    setViewMonthOverride(next);
   };
 
   // Build day cells (memoized — three picker instances share a wizard re-render cycle)
@@ -219,6 +221,7 @@ export default function CalendarPickerTH({
           onClick={() => {
             const picked = new Date(year, month, d);
             onChange(picked.toISOString());
+            setViewMonthOverride(null);
             setLocalError("");
             setIsOpen(false);
           }}
