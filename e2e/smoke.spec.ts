@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Pension Calculator Smoke Tests', () => {
+  test.use({ reducedMotion: 'reduce' });
+
   test('landing page loads with correct title', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/คำนวณบำเหน็จบำนาญ/);
@@ -31,17 +33,21 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await yearInputs.nth(2).fill('2565');
 
     await page.locator('button:has-text("ถัดไป")').click();
+    await page.waitForTimeout(500);
 
     // Step 2: Service Period
     await page.locator('text=ถัดไป').click();
+    await page.waitForTimeout(500);
 
     // Step 3: Salary History - select position
     await page.locator('select, [role="combobox"]').first().selectOption('เจ้าพนักงานพัสดุ');
     await page.locator('input[type="number"]').first().fill('40000');
     await page.locator('text=ถัดไป').click();
+    await page.waitForTimeout(500);
 
     // Step 4: Salary Table
     await page.locator('text=ถัดไป').click();
+    await page.waitForTimeout(500);
 
     // Step 5: Results
     await expect(page.locator('text=ผลการคำนวณ')).toBeVisible();
@@ -70,11 +76,15 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await yearInputs.nth(2).fill('2565');
 
     await page.locator('button:has-text("ถัดไป")').click();
+    await page.waitForTimeout(500);
     await page.locator('text=ถัดไป').click();
+    await page.waitForTimeout(500);
     await page.locator('select, [role="combobox"]').first().selectOption('เจ้าพนักงานพัสดุ');
     await page.locator('input[type="number"]').first().fill('40000');
     await page.locator('text=ถัดไป').click();
+    await page.waitForTimeout(500);
     await page.locator('text=ถัดไป').click();
+    await page.waitForTimeout(500);
 
     await expect(page.locator('text=ผลการคำนวณ')).toBeVisible();
 
