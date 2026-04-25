@@ -1,53 +1,67 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { ReactNode } from "react";
+import { motion, useReducedMotion, type HTMLMotionProps } from "framer-motion";
+import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 
 type Variant = "primary" | "secondary" | "outline" | "ghost";
 type Size = "sm" | "md" | "lg";
 
-interface ButtonProps {
-  children: ReactNode;
+interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children"> {
+  children?: ReactNode;
   variant?: Variant;
   size?: Size;
-  disabled?: boolean;
-  onClick?: () => void;
-  type?: "button" | "submit" | "reset";
-  className?: string;
   icon?: ReactNode;
+  fullWidth?: boolean;
 }
 
 const vClasses: Record<Variant, string> = {
-  primary: "bg-[var(--primary)] text-white hover:bg-[var(--primary-light)] shadow-md",
-  secondary: "bg-[var(--secondary)] text-[var(--text)] hover:bg-gray-300",
-  outline: "border-2 border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)] hover:text-white",
-  ghost: "text-[var(--primary)] hover:bg-[var(--secondary)]",
+  primary:
+    "bg-[image:var(--gradient-mesh-primary)] text-white shadow-[var(--shadow-e2)] hover:shadow-[var(--shadow-e3)]",
+  secondary:
+    "bg-[var(--color-secondary)] text-[var(--color-primary)] hover:bg-[var(--color-secondary-dark)]",
+  outline:
+    "bg-white text-[var(--color-primary)] border-2 border-[var(--color-primary)] hover:bg-[var(--color-secondary)]",
+  ghost:
+    "bg-transparent text-[var(--color-primary)] hover:bg-[var(--color-secondary)]",
 };
 
 const sClasses: Record<Size, string> = {
-  sm: "px-3 py-1.5 text-sm rounded-lg",
-  md: "px-5 py-2.5 text-base rounded-xl",
-  lg: "px-8 py-3.5 text-lg rounded-xl",
+  sm: "px-3 py-1.5 text-sm rounded-lg min-h-[36px]",
+  md: "px-5 py-2.5 text-base rounded-xl min-h-[44px]",
+  lg: "px-8 py-3.5 text-lg rounded-xl min-h-[52px]",
 };
 
 export default function Button({
   children,
   variant = "primary",
   size = "md",
-  disabled = false,
-  onClick,
-  type = "button",
-  className = "",
   icon,
+  fullWidth,
+  className,
+  disabled,
+  type = "button",
+  ...rest
 }: ButtonProps) {
+  const reduced = useReducedMotion();
+  const animateOff = disabled || reduced;
   return (
     <motion.button
-      whileTap={disabled ? undefined : { scale: 0.98 }}
-      whileHover={disabled ? undefined : { scale: 1.02 }}
+      {...rest}
       type={type}
-      onClick={onClick}
+      whileTap={animateOff ? undefined : { scale: 0.98 }}
+      whileHover={animateOff ? undefined : { y: -1 }}
+      transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-2 font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${vClasses[variant]} ${sClasses[size]} ${className}`}
+      className={cn(
+        "inline-flex items-center justify-center gap-2 font-medium transition-shadow duration-[var(--duration-fast)]",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-light)] focus-visible:ring-offset-2",
+        "disabled:opacity-50 disabled:cursor-not-allowed",
+        vClasses[variant],
+        sClasses[size],
+        fullWidth && "w-full",
+        className,
+      )}
     >
       {icon && <span className="flex-shrink-0">{icon}</span>}
       {children}
