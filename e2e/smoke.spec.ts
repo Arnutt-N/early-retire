@@ -48,7 +48,7 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.waitForTimeout(500);
 
     // Step 4: Salary Table
-    await page.locator('text=ถัดไป').click();
+    await page.locator('text=ดูผลลัพธ์').click();
     await page.waitForTimeout(500);
 
     // Step 5: Results
