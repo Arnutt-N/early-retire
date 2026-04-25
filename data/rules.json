@@ -1,0 +1,33 @@
+{
+  "retirementAge": 60,
+  "retirementAgeBonus": { "condition": "born on or after Oct 1", "bonusYears": 1 },
+  "minimumServiceYears": 25,
+  "multiplierPeriods": [
+    { "start": "1976-10-07", "end": "1977-01-05", "label": "ปี 19" },
+    { "start": "1991-02-23", "end": "1991-05-02", "label": "ปี 34" }
+  ],
+  "pension": {
+    "nonGfp": {
+      "formula": "lastSalary * totalServiceYears",
+      "monthlyFormula": "lastSalary * totalServiceYears / 50",
+      "livelihoodMultiplier": 15,
+      "livelihoodPayments": [
+        { "age": 60, "max": 200000 },
+        { "age": 65, "max": 200000 },
+        { "age": 70, "max": null }
+      ]
+    },
+    "gfp": {
+      "formula": "lastSalary * totalServiceYears",
+      "monthlyFormula": "avg60Months * totalServiceYears / 50",
+      "monthlyFormulaAlt": "avg60Months * 0.70",
+      "takeLower": true,
+      "livelihoodMultiplier": 15,
+      "livelihoodPayments": [
+        { "age": 60, "max": 200000 },
+        { "age": 65, "max": 200000 },
+        { "age": 70, "max": 100000 }
+      ]
+    }
+  }
+}

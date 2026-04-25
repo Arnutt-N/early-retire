@@ -1,0 +1,122 @@
+[
+  {
+    "level": "ชำนาญการ",
+    "fullSalary": 58390,
+    "baseTop": 36470,
+    "baseBottom": 24410,
+    "baseMid": 29330,
+    "conditions": null
+  },
+  {
+    "level": "ชำนาญการพิเศษ",
+    "fullSalary": 69040,
+    "baseTop": 49330,
+    "baseBottom": 37200,
+    "baseMid": 40270,
+    "conditions": null
+  },
+  {
+    "level": "ชำนาญงาน",
+    "fullSalary": 54820,
+    "baseTop": 31610,
+    "baseBottom": 18480,
+    "baseMid": 24470,
+    "conditions": null
+  },
+  {
+    "level": "เชี่ยวชาญ",
+    "fullSalary": 74320,
+    "baseTop": 59630,
+    "baseBottom": 50320,
+    "baseMid": 50320,
+    "conditions": null
+  },
+  {
+    "level": "ทรงคุณวุฒิ",
+    "fullSalary": 76800,
+    "baseTop": 66700,
+    "baseBottom": 60830,
+    "baseMid": 60830,
+    "conditions": "นิติกรทรงคุณวุฒิ เมื่อได้รับเงินเดือนถึง (74,320) แล้ว ให้ใช้ฐาน ทรงคุณวุฒิระดับบน 2"
+  },
+  {
+    "level": "ทรงคุณวุฒิ2",
+    "fullSalary": 76800,
+    "baseTop": 68560,
+    "baseBottom": 60830,
+    "baseMid": 60830,
+    "conditions": null
+  },
+  {
+    "level": "ทักษะพิเศษ",
+    "fullSalary": 74320,
+    "baseTop": 63840,
+    "baseBottom": 53430,
+    "baseMid": 58630,
+    "conditions": null
+  },
+  {
+    "level": "บริหารต้น",
+    "fullSalary": 76800,
+    "baseTop": 68530,
+    "baseBottom": 62210,
+    "baseMid": 62730,
+    "conditions": null
+  },
+  {
+    "level": "บริหารสูง",
+    "fullSalary": 76800,
+    "baseTop": 71700,
+    "baseBottom": 69910,
+    "baseMid": 69910,
+    "conditions": null
+  },
+  {
+    "level": "ปฏิบัติการ",
+    "fullSalary": 43600,
+    "baseTop": 23930,
+    "baseBottom": 17980,
+    "baseMid": 20950,
+    "conditions": null
+  },
+  {
+    "level": "ปฏิบัติงาน",
+    "fullSalary": 38750,
+    "baseTop": 18110,
+    "baseBottom": 12310,
+    "baseMid": 15210,
+    "conditions": null
+  },
+  {
+    "level": "อาวุโส",
+    "fullSalary": 69040,
+    "baseTop": 35070,
+    "baseBottom": 32250,
+    "baseMid": 32250,
+    "conditions": "อาวุโส2 ใช้สำหรับ ขรก ระดับอาวุโส ที่เงินยังไม่ถึงขั้นสูงของระดับบน 1 (41,620)  ใช้ฐาน 35,070"
+  },
+  {
+    "level": "อาวุโส2",
+    "fullSalary": 69040,
+    "baseTop": 44970,
+    "baseBottom": 32250,
+    "baseMid": 35120,
+    "conditions": "แต่ถ้าเป็นอาวุโส แล้วเงินเกินขั้นสูงของฐานบน 1 (41,620) แล้ว ให้ไปใช้ฐานบน 2 (44,970)"
+  },
+  {
+    "level": "อำนวยการต้น",
+    "fullSalary": 70360,
+    "baseTop": 51290,
+    "baseBottom": 37210,
+    "baseMid": 43080,
+    "conditions": null
+  },
+  {
+    "level": "อำนวยการสูง",
+    "fullSalary": 74320,
+    "baseTop": 60990,
+    "baseBottom": 52320,
+    "baseMid": 52320,
+    "conditions": null
+  }
+]
