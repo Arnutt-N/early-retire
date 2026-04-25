@@ -15,6 +15,7 @@
 - vercel via git hub ; https://github.com/Arnutt-N/early-retire.git
 
 #ข้อมูลทั่วไป
+- เป็นสมาชิก กบข. / ไม่เป็นสมาชิก กบข.
 -วันเดือนปีเกิด พ.ศ. datepicker
 -วันบรรจุ พ.ศ.  datepicker
 -วันที่พ้นส่วนราชการ พ.ศ. เลือก
