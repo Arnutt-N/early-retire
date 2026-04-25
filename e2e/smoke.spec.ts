@@ -85,7 +85,7 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.locator('input[type="number"]').first().fill('40000');
     await page.locator('text=ถัดไป').click();
     await page.waitForTimeout(500);
-    await page.locator('text=ถัดไป').click();
+    await page.locator('text=ดูผลลัพธ์').click();
     await page.waitForTimeout(500);
 
     await expect(page.locator('text=ผลการคำนวณ')).toBeVisible();
