@@ -1,19 +1,19 @@
 "use client";
 
 import { motion } from "framer-motion";
-import type { SalaryRecord, SalaryBaseInfo } from "@/lib/calculations";
+import type { SalaryRecord } from "@/lib/calculations";
 import type { FormState, SalaryOverride } from "@/types";
 import { formatNumber } from "@/lib/utils";
 import { Calculator, TrendingUp, AlertCircle, Trash2, ChevronLeft, Settings } from "lucide-react";
 import Button from "@/components/ui/Button";
 import CalendarPickerTH from "@/components/ui/CalendarPickerTH";
 import { cn } from "@/lib/utils";
+import { LEVEL_DISPLAY_ORDER } from "@/lib/levels";
 
 interface Props {
   form: FormState;
   updateForm: (updates: Partial<FormState>) => void;
   records: SalaryRecord[];
-  salaryBases: SalaryBaseInfo[];
   onNext: () => void;
   onBack: () => void;
 }
@@ -22,7 +22,6 @@ export default function SalaryTableSection({
   form,
   updateForm,
   records,
-  salaryBases,
   onNext,
   onBack,
 }: Props) {
@@ -79,16 +78,16 @@ export default function SalaryTableSection({
           </label>
         </div>
         <p className="text-xs text-violet-600 mb-3">
-          ใช้เป็น default ของทุกแถว — สามารถแก้ไขรายแถวด้านล่างได้หากตำแหน่งเปลี่ยน
+          ใช้เป็นค่าเริ่มต้นของทุกแถว — สามารถแก้ไขรายแถวด้านล่างได้หากตำแหน่งเปลี่ยน
         </p>
         <select
           value={form.defaultLevel}
           onChange={(e) => updateForm({ defaultLevel: e.target.value })}
           className="w-full px-4 py-3 min-h-[48px] rounded-xl border-2 border-violet-200 bg-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-200 font-medium text-gray-900"
         >
-          {salaryBases.map((b) => (
-            <option key={b.level} value={b.level}>
-              {b.level}
+          {LEVEL_DISPLAY_ORDER.map((l) => (
+            <option key={l.value} value={l.value}>
+              {l.label}
             </option>
           ))}
         </select>
@@ -180,9 +179,9 @@ export default function SalaryTableSection({
                         onChange={(e) => updateOverride(i, { level: e.target.value })}
                         className="w-full px-4 py-3 min-h-[48px] rounded-xl border-2 border-gray-200 bg-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-200 font-medium"
                       >
-                        {salaryBases.map((b) => (
-                          <option key={b.level} value={b.level}>
-                            {b.level}
+                        {LEVEL_DISPLAY_ORDER.map((l) => (
+                          <option key={l.value} value={l.value}>
+                            {l.label}
                           </option>
                         ))}
                       </select>
