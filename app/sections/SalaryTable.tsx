@@ -51,7 +51,7 @@ export default function SalaryTableSection({
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="space-y-8"
+      className="space-y-6"
     >
       {/* Header */}
       <div className="flex items-start gap-4">
@@ -70,8 +70,8 @@ export default function SalaryTableSection({
       </div>
 
       {/* Default Level Picker */}
-      <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-100 rounded-2xl p-6">
-        <div className="flex items-center gap-2 mb-3">
+      <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-100 rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-2">
           <Settings size={18} className="text-violet-600" />
           <label className="text-sm font-semibold text-violet-900">
             ระดับตำแหน่งของคุณ
@@ -83,7 +83,7 @@ export default function SalaryTableSection({
         <select
           value={form.defaultLevel}
           onChange={(e) => updateForm({ defaultLevel: e.target.value })}
-          className="w-full px-4 py-3 min-h-[48px] rounded-xl border-2 border-violet-200 bg-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-200 font-medium text-gray-900"
+          className="w-full px-4 py-3 min-h-[48px] rounded-xl border-2 border-violet-200 bg-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-200 font-medium text-gray-900 cursor-pointer"
         >
           {LEVEL_DISPLAY_ORDER.map((l) => (
             <option key={l.value} value={l.value}>
@@ -93,7 +93,7 @@ export default function SalaryTableSection({
         </select>
       </div>
 
-      {/* Records */}
+      {/* Records — Single Table */}
       {records.length === 0 ? (
         <div className="text-center py-16 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
           <Calculator size={48} className="mx-auto mb-4 text-gray-300" />
@@ -101,150 +101,138 @@ export default function SalaryTableSection({
           <p className="text-sm text-gray-400 mt-1">เพื่อดูตารางคำนวณเงินเดือน</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {records.map((r, i) => {
-            const override = form.salaryOverrides[i];
-            const hasOverride =
-              !!override?.level || !!override?.effectiveDate || override?.percent !== null;
-            
-            return (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03 }}
-                className={cn(
-                  "bg-white rounded-2xl border-2 overflow-hidden shadow-[var(--shadow-e1)] hover:shadow-[var(--shadow-e2)] transition-shadow",
-                  r.isCurrent
-                    ? "border-amber-300"
-                    : r.isEstimated
-                      ? "border-gray-100"
-                      : "border-gray-100"
-                )}
-              >
-                {/* Record Header */}
-                <div className={cn(
-                  "px-5 py-3 flex items-center justify-between",
-                  r.isCurrent
-                    ? "bg-gradient-to-r from-amber-50 to-orange-50"
-                    : r.isEstimated
-                      ? "bg-gradient-to-r from-gray-50 to-slate-50"
-                      : "bg-gray-50"
-                )}>
-                  <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-sm font-bold text-gray-600">
-                      {i + 1}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">รอบที่ {i + 1}</span>
-                      {r.isCurrent && (
-                        <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
-                          ปัจจุบัน
-                        </span>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-[var(--shadow-e1)] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gradient-to-r from-violet-50 to-purple-50 border-b border-violet-100">
+                  <th className="px-3 py-3 text-left font-semibold text-violet-900 whitespace-nowrap">รอบ</th>
+                  <th className="px-3 py-3 text-left font-semibold text-violet-900 whitespace-nowrap">วันที่มีผล</th>
+                  <th className="px-3 py-3 text-left font-semibold text-violet-900 whitespace-nowrap">ระดับตำแหน่ง</th>
+                  <th className="px-3 py-3 text-right font-semibold text-violet-900 whitespace-nowrap">เงินเดือนเดิม</th>
+                  <th className="px-3 py-3 text-right font-semibold text-violet-900 whitespace-nowrap">ขั้นสูง</th>
+                  <th className="px-3 py-3 text-right font-semibold text-violet-900 whitespace-nowrap">ฐาน</th>
+                  <th className="px-3 py-3 text-right font-semibold text-violet-900 whitespace-nowrap">% เลื่อน</th>
+                  <th className="px-3 py-3 text-right font-semibold text-violet-900 whitespace-nowrap">เลื่อนจริง</th>
+                  <th className="px-3 py-3 text-right font-semibold text-violet-900 whitespace-nowrap">เงินเดือนใหม่</th>
+                  <th className="px-2 py-3 text-center font-semibold text-violet-900 w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((r, i) => {
+                  const override = form.salaryOverrides[i];
+                  const hasOverride =
+                    !!override?.level ||
+                    !!override?.effectiveDate ||
+                    override?.percent !== null;
+                  return (
+                    <tr
+                      key={i}
+                      className={cn(
+                        "border-b border-gray-100 last:border-b-0 transition-colors",
+                        r.isCurrent && "bg-amber-50/40",
+                        r.isEstimated && !r.isCurrent && "bg-gray-50/30",
                       )}
-                      {r.isEstimated && (
-                        <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 rounded-full flex items-center gap-1">
-                          <AlertCircle size={12} />
-                          ประมาณการ
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {hasOverride && (
-                    <button
-                      type="button"
-                      onClick={() => clearOverride(i)}
-                      aria-label="ล้างการแก้ไขแถวนี้"
-                      className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                     >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Record Body */}
-                <div className="p-5 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <CalendarPickerTH
-                      label="วันที่มีผล"
-                      value={override?.effectiveDate ?? r.period}
-                      onChange={(d) => updateOverride(i, { effectiveDate: d })}
-                    />
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        ระดับตำแหน่ง
-                      </label>
-                      <select
-                        value={override?.level ?? r.level}
-                        onChange={(e) => updateOverride(i, { level: e.target.value })}
-                        className="w-full px-4 py-3 min-h-[48px] rounded-xl border-2 border-gray-200 bg-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-200 font-medium"
-                      >
-                        {LEVEL_DISPLAY_ORDER.map((l) => (
-                          <option key={l.value} value={l.value}>
-                            {l.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Salary Details */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 rounded-xl p-4">
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">เงินเดือนเดิม</p>
-                      <p className="font-semibold text-gray-900">{formatNumber(r.oldSalary)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">เงินเดือนขั้นสูง</p>
-                      <p className="font-semibold text-gray-900">{formatNumber(r.maxSalary)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">ฐานคำนวณ</p>
-                      <p className="font-semibold text-gray-900">{formatNumber(r.base)}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">
-                        % เลื่อน
-                        {r.isEstimated && (
-                          <span className="text-amber-600 ml-1">(ค่าเฉลี่ย)</span>
-                        )}
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={override?.percent ?? r.percent}
-                        onChange={(e) => {
-                          const v = parseFloat(e.target.value);
-                          updateOverride(i, { percent: isNaN(v) ? null : v });
-                        }}
-                        className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 bg-white text-right font-medium focus:outline-none focus:border-violet-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Result Row */}
-                  <div className="flex items-center justify-between pt-2">
-                    <div>
-                      <p className="text-xs text-gray-500">เงินที่เลื่อนจริง</p>
-                      <p className="font-semibold text-emerald-600">+{formatNumber(r.actualIncrease)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500">เงินเดือนใหม่</p>
-                      <p className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+                      <td className="px-3 py-2.5 align-middle whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-gray-700">{i + 1}</span>
+                          {r.isCurrent && (
+                            <span
+                              className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 rounded"
+                              title="รอบปัจจุบัน"
+                            >
+                              ปัจจุบัน
+                            </span>
+                          )}
+                          {r.isEstimated && !r.isCurrent && (
+                            <span
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 rounded"
+                              title="รอบในอนาคต — ใช้ค่าเฉลี่ย %"
+                            >
+                              <AlertCircle size={10} />
+                              ประมาณ
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2.5 align-middle min-w-[200px]">
+                        <CalendarPickerTH
+                          value={override?.effectiveDate ?? r.period}
+                          onChange={(d) => updateOverride(i, { effectiveDate: d })}
+                        />
+                      </td>
+                      <td className="px-2 py-2.5 align-middle min-w-[180px]">
+                        <select
+                          value={override?.level ?? r.level}
+                          onChange={(e) => updateOverride(i, { level: e.target.value })}
+                          className="w-full px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs focus:outline-none focus:border-violet-500 cursor-pointer"
+                        >
+                          {LEVEL_DISPLAY_ORDER.map((l) => (
+                            <option key={l.value} value={l.value}>
+                              {l.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2.5 align-middle text-right tabular-nums">
+                        {formatNumber(r.oldSalary)}
+                      </td>
+                      <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-500">
+                        {formatNumber(r.maxSalary)}
+                      </td>
+                      <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-500">
+                        {formatNumber(r.base)}
+                      </td>
+                      <td className="px-2 py-2.5 align-middle min-w-[80px]">
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={override?.percent ?? r.percent}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value);
+                            updateOverride(i, { percent: isNaN(v) ? null : v });
+                          }}
+                          className="w-full px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-right text-xs font-medium focus:outline-none focus:border-violet-500"
+                        />
+                      </td>
+                      <td className="px-3 py-2.5 align-middle text-right tabular-nums text-emerald-600 font-semibold">
+                        +{formatNumber(r.actualIncrease)}
+                      </td>
+                      <td className="px-3 py-2.5 align-middle text-right tabular-nums font-bold text-violet-700">
                         {formatNumber(r.newSalary)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+                      </td>
+                      <td className="px-2 py-2.5 align-middle text-center">
+                        {hasOverride && (
+                          <button
+                            type="button"
+                            onClick={() => clearOverride(i)}
+                            aria-label={`ล้างการแก้ไขแถวที่ ${i + 1}`}
+                            className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                            title="ล้างการแก้ไขแถวนี้"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Navigation */}
       <div className="flex justify-between pt-4">
-        <Button variant="outline" onClick={onBack} icon={<ChevronLeft size={18} />} iconPosition="left">
+        <Button
+          variant="outline"
+          onClick={onBack}
+          icon={<ChevronLeft size={18} />}
+          iconPosition="left"
+        >
           กลับ
         </Button>
         <Button onClick={onNext} size="lg" icon={<TrendingUp size={18} />}>

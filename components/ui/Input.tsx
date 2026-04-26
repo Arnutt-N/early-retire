@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
+import type { ReactNode, FocusEvent } from "react";
 
 interface InputProps {
   label?: string;
@@ -38,6 +38,17 @@ export default function Input({
   step,
   className,
 }: InputProps) {
+  // For number inputs, select all text on focus so typing replaces the leading 0
+  // (fixes UX issue: "0" + typed "5" → "05" briefly)
+  const handleFocus =
+    type === "number"
+      ? (e: FocusEvent<HTMLInputElement>) => e.target.select()
+      : undefined;
+
+  // For number inputs, hide a literal "0" so the placeholder shows instead
+  const displayValue =
+    type === "number" && (value === 0 || value === "0") ? "" : value;
+
   return (
     <div className="w-full">
       {label && (
@@ -54,9 +65,10 @@ export default function Input({
         )}
         <input
           type={type}
-          value={value}
+          value={displayValue}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
+          onFocus={handleFocus}
+          placeholder={placeholder ?? (type === "number" ? "0" : undefined)}
           disabled={disabled}
           min={min}
           max={max}

@@ -20,7 +20,7 @@ import {
   type SalaryBaseInfo,
 } from "@/lib/calculations";
 import salaryBasesData from "@/data/salary-bases.json";
-import { Calculator, Shield } from "lucide-react";
+import { Calculator, RotateCcw } from "lucide-react";
 
 const salaryBases = salaryBasesData as SalaryBaseInfo[];
 
@@ -170,6 +170,20 @@ export default function Home() {
   const goNext = () => setStep((s) => Math.min(s + 1, 5));
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
+  const handleReset = () => {
+    if (typeof window === "undefined") return;
+    const confirmed = window.confirm(
+      "ต้องการเริ่มใหม่? ข้อมูลที่กรอกไว้ทั้งหมดจะถูกล้าง",
+    );
+    if (!confirmed) return;
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+    window.location.reload();
+  };
+
   const steps = [
     <ModeSelect key="0" form={form} updateForm={updateForm} onNext={goNext} />,
     <PersonalInfoForm
@@ -177,6 +191,7 @@ export default function Home() {
       form={form}
       updateForm={updateForm}
       onNext={goNext}
+      onBack={goBack}
     />,
     <ServicePeriodForm
       key="2"
@@ -216,52 +231,31 @@ export default function Home() {
 
   return (
     <main className="min-h-screen flex flex-col bg-[var(--background)]">
-      {/* Premium Hero Header */}
-      <header className="relative overflow-hidden bg-[image:var(--gradient-mesh-hero)] text-white">
-        {/* Decorative elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-1/2 -right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl" />
-          <div className="absolute -bottom-1/2 -left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl" />
-          <div className="absolute top-1/4 left-1/3 w-64 h-64 bg-cyan-500/10 rounded-full blur-2xl" />
-        </div>
-        
-        <div className="relative max-w-4xl mx-auto px-4 py-8 md:py-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className="flex items-start gap-4"
+      {/* Minimal translucent navbar (sticky) */}
+      <header className="sticky top-0 z-50 bg-white/85 backdrop-blur-md border-b border-gray-100 shadow-sm">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+              <Calculator size={18} className="text-white" />
+            </div>
+            <h1 className="text-base md:text-lg font-bold text-gray-900 truncate">
+              คำนวณบำเหน็จบำนาญ
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={handleReset}
+            aria-label="เริ่มใหม่ — ล้างข้อมูลที่กรอกไว้"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors min-h-[40px] cursor-pointer"
           >
-            <div className="hidden md:flex w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm items-center justify-center border border-white/20 shadow-lg">
-              <Calculator size={32} className="text-white" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-3 py-1 text-xs font-medium bg-white/15 backdrop-blur-sm rounded-full border border-white/20">
-                  ระบบคำนวณอัตโนมัติ
-                </span>
-              </div>
-              <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-balance">
-                คำนวณบำเหน็จบำนาญ
-              </h1>
-              <p className="text-blue-100/90 mt-2 text-sm md:text-base max-w-xl">
-                กองบริหารทรัพยากรบุคคล สำนักงานปลัดกระทรวงยุติธรรม
-              </p>
-              <div className="flex items-center gap-3 mt-4">
-                <div className="flex items-center gap-1.5 text-xs text-blue-200/80">
-                  <Shield size={14} />
-                  <span>ปลอดภัย & เป็นส่วนตัว</span>
-                </div>
-                <span className="w-1 h-1 rounded-full bg-blue-200/50" />
-                <span className="text-xs text-blue-200/80">ข้อมูลไม่ถูกเก็บบนเซิร์ฟเวอร์</span>
-              </div>
-            </div>
-          </motion.div>
+            <RotateCcw size={16} />
+            <span className="hidden sm:inline">เริ่มใหม่</span>
+          </button>
         </div>
       </header>
 
-      {/* Sticky Progress Bar */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50 shadow-sm">
+      {/* Progress Bar (own row, below navbar) */}
+      <div className="bg-white border-b border-gray-100">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <ProgressBar currentStep={step} />
         </div>
