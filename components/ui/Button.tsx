@@ -1,18 +1,23 @@
 "use client";
 
-import { motion, useReducedMotion, type HTMLMotionProps } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
+import type { ReactNode, MouseEvent } from "react";
 
 type Variant = "primary" | "secondary" | "outline" | "ghost";
 type Size = "sm" | "md" | "lg";
 
-interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children"> {
+interface ButtonProps {
   children?: ReactNode;
   variant?: Variant;
   size?: Size;
   icon?: ReactNode;
   fullWidth?: boolean;
+  disabled?: boolean;
+  type?: "button" | "submit" | "reset";
+  className?: string;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+  "aria-label"?: string;
 }
 
 const vClasses: Record<Variant, string> = {
@@ -41,18 +46,20 @@ export default function Button({
   className,
   disabled,
   type = "button",
-  ...rest
+  onClick,
+  "aria-label": ariaLabel,
 }: ButtonProps) {
   const reduced = useReducedMotion();
   const animateOff = disabled || reduced;
   return (
     <motion.button
-      {...rest}
       type={type}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
       whileTap={animateOff ? undefined : { scale: 0.98 }}
       whileHover={animateOff ? undefined : { y: -1 }}
       transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-      disabled={disabled}
       className={cn(
         "inline-flex items-center justify-center gap-2 font-medium transition-shadow duration-[var(--duration-fast)]",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-light)] focus-visible:ring-offset-2",
