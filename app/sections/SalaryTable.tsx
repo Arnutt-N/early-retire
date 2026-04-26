@@ -124,36 +124,49 @@ export default function SalaryTableSection({
         </span>
       );
     }
-    // Sub-month contribution (e.g. day-before-exit raise = 1 day) → display
-    // as "X วัน" with the indigo "raise marker" treatment.
-    if (months < 1) {
-      const days = Math.max(1, Math.round(months * 30.4375));
+    // Convert fractional months → "X เดือน Y วัน" with calendar-aware
+    // splitting (avg 30.4375 days/month). Examples:
+    //   monthsInWindow 5.948 → 181 days → 5 เดือน 29 วัน
+    //   monthsInWindow 6.013 → 183 days → 6 เดือน
+    //   monthsInWindow 1.347 → 41 days → 1 เดือน 11 วัน
+    //   monthsInWindow 0.033 → 1 day → 1 วัน (sub-month: indigo raise marker)
+    const totalDays = Math.max(1, Math.round(months * 30.4375));
+    if (totalDays < 30) {
       return (
         <span
           className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded"
-          title={`นับเข้าค่าเฉลี่ย ${days} วัน — เลื่อนเงินเดือน 1 วันก่อนพ้นราชการ`}
+          title={`นับเข้าค่าเฉลี่ย ${totalDays} วัน — เลื่อนเงินเดือน 1 วันก่อนพ้นราชการ`}
         >
-          {days} วัน
+          {totalDays} วัน
         </span>
       );
     }
-    const intMonths = Math.round(months);
-    const isPartial = intMonths < 6;
+    let fullMonths = Math.floor(totalDays / 30.4375 + 0.001);
+    let remainingDays = Math.round(totalDays - fullMonths * 30.4375);
+    if (remainingDays >= 30) {
+      fullMonths += 1;
+      remainingDays = 0;
+    }
+    const isFullSixMonths = fullMonths === 6 && remainingDays === 0;
+    const label =
+      remainingDays === 0
+        ? `${fullMonths} เดือน`
+        : `${fullMonths} เดือน ${remainingDays} วัน`;
     return (
       <span
         className={cn(
           "inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded",
-          isPartial
-            ? "bg-amber-100 text-amber-700"
-            : "bg-emerald-100 text-emerald-700",
+          isFullSixMonths
+            ? "bg-emerald-100 text-emerald-700"
+            : "bg-amber-100 text-amber-700",
         )}
         title={
-          isPartial
-            ? `แถวคาบเกี่ยวขอบช่วง 60 เดือน — นับเข้าค่าเฉลี่ยเพียง ${intMonths} เดือน`
-            : "นับเต็ม 6 เดือนในช่วง 60 เดือนเฉลี่ย"
+          isFullSixMonths
+            ? "นับเต็ม 6 เดือนในช่วง 60 เดือนเฉลี่ย"
+            : `แถวคาบเกี่ยวขอบช่วง 60 เดือน — นับเข้าค่าเฉลี่ย ${label}`
         }
       >
-        {intMonths} เดือน
+        {label}
       </span>
     );
   };
