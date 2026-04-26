@@ -73,7 +73,7 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.waitForTimeout(500);
 
     // Step 5: Results — assert all 3 amounts shown
-    await expect(page.getByRole('heading', { name: 'ผลการคำนวณ' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'สรุปบำเหน็จบำนาญ' })).toBeVisible();
     await expect(page.locator('text=เงินบำเหน็จ')).toBeVisible();
     await expect(page.locator('text=เงินบำนาญรายเดือน')).toBeVisible();
     await expect(page.locator('text=บำเหน็จดำรงชีพ')).toBeVisible();
@@ -128,7 +128,7 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.waitForTimeout(500);
 
     // Step 5 — gfp shows the same 3 amounts (computed differently)
-    await expect(page.getByRole('heading', { name: 'ผลการคำนวณ' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'สรุปบำเหน็จบำนาญ' })).toBeVisible();
     await expect(page.locator('text=เงินบำเหน็จ')).toBeVisible();
     await expect(page.locator('text=เงินบำนาญรายเดือน')).toBeVisible();
     await expect(page.locator('text=บำเหน็จดำรงชีพ')).toBeVisible();
