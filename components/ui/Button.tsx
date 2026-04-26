@@ -1,14 +1,14 @@
 "use client";
 
-import { motion, useReducedMotion, type HTMLMotionProps } from "framer-motion";
-import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { ReactNode, MouseEvent } from "react";
 
 type Variant = "primary" | "secondary" | "outline" | "ghost" | "success" | "danger";
 type Size = "sm" | "md" | "lg";
 
-interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children"> {
+interface ButtonProps {
   children?: ReactNode;
   variant?: Variant;
   size?: Size;
@@ -16,33 +16,38 @@ interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children"> {
   iconPosition?: "left" | "right";
   fullWidth?: boolean;
   loading?: boolean;
+  disabled?: boolean;
+  type?: "button" | "submit" | "reset";
+  className?: string;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+  "aria-label"?: string;
 }
 
 const variantClasses: Record<Variant, string> = {
   primary: cn(
     "bg-gradient-to-br from-blue-500 to-indigo-600 text-white",
     "shadow-md hover:shadow-lg hover:from-blue-600 hover:to-indigo-700",
-    "active:shadow-sm"
+    "active:shadow-sm",
   ),
   secondary: cn(
     "bg-gray-100 text-gray-700",
-    "hover:bg-gray-200 active:bg-gray-300"
+    "hover:bg-gray-200 active:bg-gray-300",
   ),
   outline: cn(
     "bg-white text-gray-700 border-2 border-gray-200",
-    "hover:border-gray-300 hover:bg-gray-50 active:bg-gray-100"
+    "hover:border-gray-300 hover:bg-gray-50 active:bg-gray-100",
   ),
   ghost: cn(
     "bg-transparent text-gray-600",
-    "hover:bg-gray-100 active:bg-gray-200"
+    "hover:bg-gray-100 active:bg-gray-200",
   ),
   success: cn(
     "bg-gradient-to-br from-emerald-500 to-teal-600 text-white",
-    "shadow-md hover:shadow-lg hover:from-emerald-600 hover:to-teal-700"
+    "shadow-md hover:shadow-lg hover:from-emerald-600 hover:to-teal-700",
   ),
   danger: cn(
     "bg-gradient-to-br from-red-500 to-rose-600 text-white",
-    "shadow-md hover:shadow-lg hover:from-red-600 hover:to-rose-700"
+    "shadow-md hover:shadow-lg hover:from-red-600 hover:to-rose-700",
   ),
 };
 
@@ -60,24 +65,28 @@ export default function Button({
   iconPosition = "right",
   fullWidth,
   loading,
-  className,
   disabled,
   type = "button",
-  ...rest
+  className,
+  onClick,
+  "aria-label": ariaLabel,
 }: ButtonProps) {
   const reduced = useReducedMotion();
   const isDisabled = disabled || loading;
-  
+  const animateOff = isDisabled || reduced;
+
   return (
     <motion.button
-      {...rest}
       type={type}
-      whileTap={!isDisabled && !reduced ? { scale: 0.98 } : undefined}
-      whileHover={!isDisabled && !reduced ? { y: -1 } : undefined}
-      transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+      onClick={onClick}
       disabled={isDisabled}
+      aria-label={ariaLabel}
+      aria-busy={loading || undefined}
+      whileTap={animateOff ? undefined : { scale: 0.98 }}
+      whileHover={animateOff ? undefined : { y: -1 }}
+      transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        "inline-flex items-center justify-center font-medium transition-all duration-200",
+        "inline-flex items-center justify-center font-medium transition-all duration-[var(--duration-fast)]",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2",
         "disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none",
         variantClasses[variant],

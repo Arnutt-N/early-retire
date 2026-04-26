@@ -336,7 +336,7 @@ export default function CalendarPickerTH({
           ref={yearRef}
           type="text"
           inputMode="numeric"
-          placeholder="พ.ศ."
+          placeholder="ปปปป (พ.ศ.)"
           defaultValue={parts.beYear}
           onInput={(e) => handleInput(e, 'year')}
           onBlur={handleBlur}

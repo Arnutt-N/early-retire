@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import type { SalaryRecord, SalaryBaseInfo } from "@/lib/calculations";
 import type { FormState, SalaryOverride } from "@/types";
 import { formatNumber } from "@/lib/utils";
-import { Calculator, TrendingUp, AlertCircle, Trash2, ChevronLeft, ChevronRight, Settings } from "lucide-react";
+import { Calculator, TrendingUp, AlertCircle, Trash2, ChevronLeft, Settings } from "lucide-react";
 import Button from "@/components/ui/Button";
 import CalendarPickerTH from "@/components/ui/CalendarPickerTH";
 import { cn } from "@/lib/utils";
