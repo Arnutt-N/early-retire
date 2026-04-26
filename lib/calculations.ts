@@ -311,8 +311,24 @@ export function generateSalaryTable(
     // Per-row effective-date override jumps the cursor for this row only
     const rowDate = override?.effectiveDate ? new Date(override.effectiveDate) : cursor;
 
+    // Round offset relative to snappedAssessment (in 6-month units):
+    //   0  = the assessment-date round (latest raise = "ปัจจุบัน")
+    //   −N = N rounds before assessment (historical, may have user-input %)
+    //   +N = N rounds after assessment (future projection = "ประมาณ")
+    // increases[] is indexed from latest raise: increases[0] = at assessment,
+    // increases[1] = previous round, …, increases[5] = 5 rounds back. So the
+    // mapping from offset → increases index is `-offset` for offset ∈ [-5, 0].
+    // Older rows (offset < −5) silently fall back to avgPercent but are NOT
+    // badged "ประมาณ" — only future rows get that badge.
+    const monthsDiff =
+      (cursor.getFullYear() - snappedAssessment.getFullYear()) * 12 +
+      (cursor.getMonth() - snappedAssessment.getMonth());
+    const roundOffset = Math.round(monthsDiff / 6);
+    const increasesIdx = -roundOffset;
     const computedPercent =
-      periodCount < increases.length ? increases[periodCount] : avgPercent;
+      increasesIdx >= 0 && increasesIdx < increases.length
+        ? increases[increasesIdx]
+        : avgPercent;
     const percent = override?.percent ?? computedPercent;
     const useBase = selectBaseForSalary(salary, rowBaseInfo);
     const rawIncrease = useBase * (percent / 100);
@@ -321,13 +337,8 @@ export function generateSalaryTable(
     const cappedNewSalary =
       newSalary > rowBaseInfo.fullSalary ? rowBaseInfo.fullSalary : newSalary;
 
-    // "ปัจจุบัน" badge marks the row whose fiscal-round date matches the
-    // user's latest salary-increase date. For GFP scenarios the table can
-    // extend back beyond the assessment (windowStart < assessment), so
-    // the first row in the table is OLDER than the assessment — using
-    // `periodCount === 0` would mislabel the wrong row.
-    const isCurrent = cursor.getTime() === snappedAssessment.getTime();
-    const isEstimated = periodCount >= increases.length;
+    const isCurrent = roundOffset === 0;
+    const isEstimated = roundOffset > 0;
 
     records.push({
       period: rowDate.toISOString(),
