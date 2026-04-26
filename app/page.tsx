@@ -83,6 +83,10 @@ export default function Home() {
   const [form, setForm] = useState<FormState>(loadInitialForm);
   const [step, setStep] = useState(0);
   const [resetOpen, setResetOpen] = useState(false);
+  // Track which (birth|start|end) combination the user last dismissed the
+  // eligibility warning for. If they edit dates back to ineligible the modal
+  // resurfaces because the key changes.
+  const [eligibilityAckedKey, setEligibilityAckedKey] = useState<string | null>(null);
 
   const updateForm = (updates: Partial<FormState>) => {
     setForm((prev) => {
@@ -174,6 +178,38 @@ export default function Home() {
 
   const goNext = () => setStep((s) => Math.min(s + 1, 5));
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
+
+  // Eligibility check: Thai civil-servant pension rule = service ≥ 10 years
+  // for any lump-sum/pension entitlement. Below that, only the personal GFP
+  // balance is returned (for GFP members).
+  const eligibilityKey = `${form.birthDate ?? ""}|${form.startDate ?? ""}|${form.endDate ?? ""}`;
+  const eligibilityCheck = useMemo(() => {
+    if (!form.birthDate || !form.startDate || !form.endDate) return null;
+    const birth = new Date(form.birthDate);
+    const start = new Date(form.startDate);
+    const end = new Date(form.endDate);
+    if (
+      isNaN(birth.getTime()) ||
+      isNaN(start.getTime()) ||
+      isNaN(end.getTime())
+    ) {
+      return null;
+    }
+    const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
+    const serviceYears = (end.getTime() - start.getTime()) / msPerYear;
+    const ageAtRetirement = (end.getTime() - birth.getTime()) / msPerYear;
+    return {
+      serviceYears,
+      ageAtRetirement,
+      eligible: serviceYears >= 10,
+    };
+  }, [form.birthDate, form.startDate, form.endDate]);
+
+  const showEligibilityWarn =
+    step >= 1 &&
+    eligibilityCheck !== null &&
+    !eligibilityCheck.eligible &&
+    eligibilityAckedKey !== eligibilityKey;
 
   const performReset = () => {
     if (typeof window === "undefined") return;
@@ -292,6 +328,39 @@ export default function Home() {
         confirmLabel="เริ่มใหม่"
         cancelLabel="ยกเลิก"
         variant="danger"
+      />
+
+      <ConfirmModal
+        open={showEligibilityWarn}
+        variant="info"
+        title="ข้อมูลไม่เข้าเงื่อนไขการรับบำเหน็จ/บำนาญ"
+        description={
+          <>
+            จากวันที่บรรจุและวันพ้นราชการที่กรอก คำนวณได้
+            <span className="font-semibold text-gray-900">
+              {" "}อายุราชการประมาณ {eligibilityCheck?.serviceYears.toFixed(1)} ปี
+            </span>{" "}
+            ซึ่งน้อยกว่า 10 ปี — ไม่เข้าเงื่อนไขการรับบำเหน็จหรือบำนาญข้าราชการ
+            <br />
+            <br />
+            หากท่านเป็นสมาชิก กบข. จะยังคงมีสิทธิรับ
+            <span className="font-semibold text-gray-900"> เงินสะสม กบข. </span>
+            ที่สะสมไว้ตลอดอายุราชการ
+            <br />
+            <br />
+            <span className="text-gray-500">
+              โปรดตรวจสอบวันบรรจุและวันพ้นราชการอีกครั้ง หากข้อมูลถูกต้อง
+              สามารถคลิก &quot;ดำเนินการต่อ&quot; เพื่อดูตัวเลขประมาณการได้
+            </span>
+          </>
+        }
+        confirmLabel="ดำเนินการต่อ"
+        cancelLabel="กลับไปแก้ไข"
+        onConfirm={() => setEligibilityAckedKey(eligibilityKey)}
+        onCancel={() => {
+          setEligibilityAckedKey(eligibilityKey);
+          setStep(1);
+        }}
       />
     </main>
   );
