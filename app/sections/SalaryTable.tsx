@@ -15,6 +15,8 @@ import {
   Pencil,
   Check,
   ChevronDown,
+  CalendarRange,
+  Plus,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import CalendarPickerTH from "@/components/ui/CalendarPickerTH";
@@ -64,6 +66,36 @@ export default function SalaryTableSection({
       ? `${records.length} รอบ × 6 เดือน = ${totalMonths} เดือน — ขั้นต่ำ 60 เดือนสุดท้าย หรือถึงวันเลื่อนเงินเดือนล่าสุด แล้วแต่ระยะใดยาวกว่า`
       : `วันเลื่อนเงินเดือนล่าสุด → วันก่อนพ้นราชการ (${records.length} รอบ × 6 เดือน = ${totalMonths} เดือน)`;
 
+  // 60-month window used for the GFP averaging formula = STRICTLY the last 10 rounds.
+  // The table itself can extend further back (so users can edit historical %),
+  // but the average for the pension formula only uses last10.
+  const last10 = records.slice(-10);
+  const last10Count = last10.length;
+  const last10StartPeriod = last10[0]?.period ?? null;
+  const last10EndPeriod = last10[last10Count - 1]?.period ?? null;
+  const last10TotalMonths = last10Count * 6;
+
+  // "Extend window backward" — push latestAssessmentDate back one round (6 months)
+  // so generateSalaryTable produces one more historical row. Useful when the
+  // GFP table somehow has < 10 rounds (very short career edge case) or when
+  // the user wants to inspect an extra historical assessment.
+  const extendWindowBack = () => {
+    // Anchor for the extension: current first row's period, fall back to today.
+    const firstPeriod = records[0]?.period ?? null;
+    const anchor = firstPeriod
+      ? new Date(firstPeriod)
+      : form.latestAssessmentDate
+        ? new Date(form.latestAssessmentDate)
+        : new Date();
+    if (isNaN(anchor.getTime())) return;
+    const next = new Date(anchor);
+    next.setMonth(next.getMonth() - 6);
+    updateForm({ latestAssessmentDate: next.toISOString() });
+  };
+
+  const isGfp = form.mode === "gfp";
+  const showExtendButton = isGfp && last10Count < 10;
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -110,6 +142,65 @@ export default function SalaryTableSection({
           ))}
         </select>
       </div>
+
+      {/* 60-month calculation window — GFP only. Tells the user exactly which
+          rounds feed the บำนาญ averaging formula (= last 10 rounds = 60 months),
+          even when the table itself extends further back for historical edits. */}
+      {isGfp && records.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <CalendarRange size={20} className="text-amber-700" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-amber-900 mb-1">
+                ช่วง {last10TotalMonths} เดือน ที่ใช้คำนวณบำนาญ
+              </h3>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                สูตร กบข. ใช้ค่าเฉลี่ยเงินเดือน 60 เดือนสุดท้ายก่อนพ้นราชการ
+                (ตารางด้านล่างอาจแสดงรอบเพิ่มเพื่อให้แก้ไขประวัติได้ — แต่การคำนวณใช้เฉพาะ {last10Count} รอบล่าสุด)
+              </p>
+            </div>
+          </div>
+          {last10StartPeriod && last10EndPeriod && (
+            <div className="grid grid-cols-2 gap-2 sm:gap-4 pl-13">
+              <div className="bg-white/70 rounded-lg px-3 py-2 border border-amber-100">
+                <p className="text-[10px] uppercase tracking-wide text-amber-600 font-medium mb-0.5">
+                  เริ่มต้น
+                </p>
+                <p className="text-sm font-bold text-amber-900 tabular-nums">
+                  {formatThaiDate(last10StartPeriod)}
+                </p>
+              </div>
+              <div className="bg-white/70 rounded-lg px-3 py-2 border border-amber-100">
+                <p className="text-[10px] uppercase tracking-wide text-amber-600 font-medium mb-0.5">
+                  สิ้นสุด (วันก่อนพ้นราชการ)
+                </p>
+                <p className="text-sm font-bold text-amber-900 tabular-nums">
+                  {formatThaiDate(last10EndPeriod)}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {showExtendButton && (
+            <div className="mt-4 pt-4 border-t border-amber-200">
+              <p className="text-xs text-amber-700 mb-2">
+                ตอนนี้ตารางมีเพียง {last10Count} รอบ ({last10TotalMonths} เดือน)
+                — น้อยกว่า 60 เดือน หากต้องการเพิ่มรอบย้อนหลังเพื่อให้ครบ คลิกปุ่มด้านล่าง
+              </p>
+              <button
+                type="button"
+                onClick={extendWindowBack}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+              >
+                <Plus size={14} />
+                เพิ่มรอบย้อนหลัง 6 เดือน
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Records */}
       {records.length === 0 ? (
