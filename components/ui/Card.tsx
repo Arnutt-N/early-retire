@@ -10,11 +10,10 @@ interface CardProps extends Omit<HTMLMotionProps<"div">, "children"> {
   children?: ReactNode;
   header?: ReactNode;
   footer?: ReactNode;
-  /** Render the header with the primary gradient. Use sparingly — chrome only. */
   gradientHeader?: boolean;
   elevation?: Elevation;
-  /** Hover-lift effect (default: true for backward compat with existing call sites). */
   hover?: boolean;
+  padding?: "none" | "sm" | "md" | "lg";
 }
 
 const elevationClass: Record<Elevation, string> = {
@@ -24,6 +23,13 @@ const elevationClass: Record<Elevation, string> = {
   e4: "shadow-[var(--shadow-e4)]",
 };
 
+const paddingClass: Record<"none" | "sm" | "md" | "lg", string> = {
+  none: "p-0",
+  sm: "p-4",
+  md: "p-6",
+  lg: "p-8",
+};
+
 export default function Card({
   children,
   header,
@@ -31,17 +37,19 @@ export default function Card({
   gradientHeader,
   elevation = "e2",
   hover = true,
+  padding = "md",
   className,
   ...rest
 }: CardProps) {
   const reduced = useReducedMotion();
+  
   return (
     <motion.div
       {...rest}
-      whileHover={hover && !reduced ? { y: -2 } : undefined}
-      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={hover && !reduced ? { y: -2, scale: 1.005 } : undefined}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        "bg-[var(--surface-data)] rounded-2xl border border-gray-100 overflow-hidden transition-shadow duration-[var(--duration-fast)]",
+        "bg-white rounded-2xl border border-gray-100 overflow-hidden transition-shadow duration-200",
         elevationClass[elevation],
         hover && "hover:shadow-[var(--shadow-e3)]",
         className,
@@ -52,14 +60,14 @@ export default function Card({
           className={cn(
             "px-6 py-4",
             gradientHeader
-              ? "bg-[image:var(--gradient-mesh-primary)] text-white"
-              : "border-b border-gray-100 bg-gray-50/50",
+              ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white"
+              : "border-b border-gray-100 bg-gradient-to-r from-gray-50 to-slate-50",
           )}
         >
           {header}
         </div>
       )}
-      <div className="p-6">{children}</div>
+      <div className={cn(paddingClass[padding])}>{children}</div>
       {footer && (
         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50">{footer}</div>
       )}

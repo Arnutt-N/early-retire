@@ -14,6 +14,7 @@ interface InputProps {
   disabled?: boolean;
   required?: boolean;
   suffix?: ReactNode;
+  prefix?: ReactNode;
   min?: number;
   max?: number;
   step?: number;
@@ -31,6 +32,7 @@ export default function Input({
   disabled,
   required,
   suffix,
+  prefix,
   min,
   max,
   step,
@@ -39,12 +41,17 @@ export default function Input({
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium mb-1.5">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
           {label}
-          {required && <span className="text-[var(--color-accent)] ml-1">*</span>}
+          {required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       <div className="relative">
+        {prefix && (
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">
+            {prefix}
+          </span>
+        )}
         <input
           type={type}
           value={value}
@@ -55,24 +62,34 @@ export default function Input({
           max={max}
           step={step}
           className={cn(
-            "w-full px-4 py-3 min-h-[44px] rounded-xl border-2 bg-white transition-colors duration-[var(--duration-fast)]",
-            "focus:outline-none focus:border-[var(--color-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-primary-light)]",
-            "disabled:bg-gray-100 disabled:text-gray-400",
+            "w-full px-4 py-3 min-h-[48px] rounded-xl border-2 bg-white transition-all duration-200",
+            "text-gray-900 font-medium placeholder:text-gray-400 placeholder:font-normal",
+            "focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-100",
+            "disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed",
+            "hover:border-gray-300",
             error
-              ? "border-[var(--color-accent)]"
-              : "border-gray-200 hover:border-gray-300",
-            suffix && "pr-12",
+              ? "border-red-300 focus:border-red-500 focus-visible:ring-red-100"
+              : "border-gray-200",
+            prefix && "pl-10",
+            suffix && "pr-14",
             className,
           )}
         />
         {suffix && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none font-medium">
             {suffix}
           </span>
         )}
       </div>
-      {error && <p className="mt-1 text-sm text-[var(--color-accent)]">{error}</p>}
-      {helper && !error && <p className="mt-1 text-sm text-gray-500">{helper}</p>}
+      {error && (
+        <p className="mt-1.5 text-sm text-red-500 flex items-center gap-1">
+          <span className="w-1 h-1 rounded-full bg-red-500" />
+          {error}
+        </p>
+      )}
+      {helper && !error && (
+        <p className="mt-1.5 text-sm text-gray-500">{helper}</p>
+      )}
     </div>
   );
 }

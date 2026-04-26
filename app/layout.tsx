@@ -23,9 +23,9 @@ export default function RootLayout({
   return (
     <html
       lang="th"
-      className={`${notoSansThai.variable} h-full antialiased`}
+      className={`${notoSansThai.variable} h-full antialiased scroll-smooth`}
     >
-      <body className={`min-h-full flex flex-col bg-background text-foreground ${notoSansThai.className}`}>
+      <body className={`min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)] ${notoSansThai.className}`}>
         {children}
       </body>
     </html>
