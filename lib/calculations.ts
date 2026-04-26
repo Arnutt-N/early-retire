@@ -380,31 +380,86 @@ export function generateSalaryTable(
     return { ...r, monthsInWindow };
   });
 
-  // Append the synthetic "วันก่อนพ้นราชการ" marker row. Carries the salary
-  // that applied on the last day of work (same as the previous row's
-  // newSalary — exit doesn't trigger a raise). For non-GFP this is the
-  // "เงินเดือนสุดท้าย" that drives the formula. monthsInWindow = 0 so it
-  // never affects the GFP averaging.
+  // Append the synthetic "วันก่อนพ้นราชการ" marker row.
+  //
+  // Special Thai-civil-service rule: when retirement falls on a fiscal-year
+  // boundary (1/4 or 1/10 — typical retirement at age 60 lands on 1/10), the
+  // retiree gets the next fiscal raise applied 1 day BEFORE retirement (i.e.
+  // on 30/9 for retire 1/10). That single day at the raised salary IS counted
+  // toward the 60-month average.
+  //   → monthsInWindow ≈ 1/30.4375 (one day expressed in months)
+  //   → previous row's monthsInWindow is reduced by the same amount to keep
+  //     the total at exactly 60 months
+  //   → newSalary on the marker reflects the raise (oldSalary + actualIncrease)
+  //   → for non-GFP this becomes the "เงินเดือนสุดท้าย" used by the formula
+  //
+  // For non-fiscal exits (e.g., resignation 1/6) the marker carries the same
+  // salary as the previous row and contributes nothing to the average.
   if (enriched.length > 0) {
     const lastReal = enriched[enriched.length - 1];
     const markerDate = new Date(endDate);
     markerDate.setDate(markerDate.getDate() - 1);
+
+    // Detect fiscal-boundary exit: endDate is exactly 1 April or 1 October.
+    const exitDay = endDate.getDate();
+    const exitMonth = endDate.getMonth(); // 0-based: 3 = Apr, 9 = Oct
+    const isFiscalBoundaryExit =
+      exitDay === 1 && (exitMonth === 3 || exitMonth === 9);
+
+    let markerOldSalary = lastReal.newSalary;
+    let markerNewSalary = lastReal.newSalary;
+    let markerBase = 0;
+    let markerPercent = 0;
+    let markerIncrease = 0;
+    let markerActualIncrease = 0;
+    let markerMonthsInWindow = 0;
+
+    if (isFiscalBoundaryExit) {
+      // Apply the day-before-exit raise using the same logic as a regular
+      // round (avgPercent against the active level's base).
+      const baseInfo = getSalaryBaseForLevel(lastReal.level, salaryBases);
+      if (baseInfo) {
+        const useBase = selectBaseForSalary(lastReal.newSalary, baseInfo);
+        const rawIncrease = useBase * (avgPercent / 100);
+        const actualIncrease = roundUp10(rawIncrease);
+        const cappedNewSalary = Math.min(
+          lastReal.newSalary + actualIncrease,
+          baseInfo.fullSalary,
+        );
+        markerOldSalary = lastReal.newSalary;
+        markerNewSalary = cappedNewSalary;
+        markerBase = useBase;
+        markerPercent = avgPercent;
+        markerIncrease = Math.round(rawIncrease * 100) / 100;
+        markerActualIncrease = actualIncrease;
+      }
+
+      // 1 day expressed in months (using average month length 30.4375).
+      const oneDayInMonths = 1 / 30.4375;
+      markerMonthsInWindow = oneDayInMonths;
+      // Steal 1 day's worth from the previous row so the total stays at 60.
+      lastReal.monthsInWindow = Math.max(
+        0,
+        lastReal.monthsInWindow - oneDayInMonths,
+      );
+    }
+
     enriched.push({
       period: markerDate.toISOString(),
       periodLabel: `${markerDate.getDate().toString().padStart(2, "0")}/${(
         markerDate.getMonth() + 1
       ).toString().padStart(2, "0")}/${toBE(markerDate.getFullYear())}`,
       level: lastReal.level,
-      oldSalary: lastReal.newSalary,
+      oldSalary: markerOldSalary,
       maxSalary: lastReal.maxSalary,
-      base: 0,
-      percent: 0,
-      increase: 0,
-      actualIncrease: 0,
-      newSalary: lastReal.newSalary,
+      base: markerBase,
+      percent: markerPercent,
+      increase: markerIncrease,
+      actualIncrease: markerActualIncrease,
+      newSalary: markerNewSalary,
       isEstimated: false,
       isCurrent: false,
-      monthsInWindow: 0,
+      monthsInWindow: markerMonthsInWindow,
       isExitMarker: true,
     });
   }
