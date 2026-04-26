@@ -7,12 +7,20 @@ import type {
   ServicePeriod,
   SalaryRecord,
 } from "@/lib/calculations";
-import { formatNumber, formatThaiDate } from "@/lib/utils";
+import { formatNumber, formatThaiDate, cn } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import SocialShare from "@/components/SocialShare";
 import { Award, Calendar, TrendingUp, User, Printer, Info, Wallet, Gift, ChevronLeft, Sparkles, Check, X, Scale } from "lucide-react";
+
+interface Eligibility {
+  serviceYears: number;
+  ageAtRetirement: number;
+  eligible: boolean;
+  eligibleForLumpSum: boolean;
+  eligibleForMonthly: boolean;
+}
 
 interface Props {
   mode: "gfp" | "non-gfp" | null;
@@ -23,6 +31,7 @@ interface Props {
   result: PensionResult | null;
   livelihood: LivelihoodResult | null;
   salaryRecords: SalaryRecord[];
+  eligibility: Eligibility | null;
   onBack: () => void;
 }
 
@@ -35,11 +44,23 @@ export default function ResultSection({
   result,
   livelihood,
   salaryRecords,
+  eligibility,
   onBack,
 }: Props) {
   const handlePrint = () => {
     if (typeof window !== "undefined") window.print();
   };
+
+  // Monthly-pension eligibility — defaults true if check hasn't completed yet
+  // (avoids hiding cards during initial render). When false, ResultSection
+  // shows ONLY the บำเหน็จ block + an explanation card stating exactly why
+  // บำนาญ + บำเหน็จดำรงชีพ aren't available, and hides the lump-vs-monthly
+  // comparison (no choice to make).
+  const monthlyEligible = eligibility === null || eligibility.eligibleForMonthly;
+  const showExplanation =
+    eligibility !== null &&
+    eligibility.eligibleForLumpSum &&
+    !eligibility.eligibleForMonthly;
 
   const modeLabel = mode === "gfp" ? "เป็นสมาชิก กบข." : "ไม่เป็นสมาชิก กบข.";
   const formulaNote =
@@ -115,7 +136,12 @@ export default function ResultSection({
       {/* Main Results */}
       {result ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div
+            className={cn(
+              "grid gap-6",
+              monthlyEligible ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1",
+            )}
+          >
             {/* Lump Sum */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -140,33 +166,138 @@ export default function ResultSection({
               </p>
             </motion.div>
 
-            {/* Monthly Pension */}
+            {/* Monthly Pension — only when service ≥ 25 OR (service ≥ 10 AND age ≥ 50) */}
+            {monthlyEligible && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 text-white shadow-xl"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp size={20} />
+                  <h3 className="font-semibold">เงินบำนาญรายเดือน</h3>
+                </div>
+                <div className="text-center py-4">
+                  <AnimatedNumber
+                    value={result.monthly}
+                    decimals={2}
+                    className="text-4xl md:text-5xl font-bold block thai-num"
+                  />
+                  <p className="text-emerald-100 mt-2">บาท / เดือน</p>
+                </div>
+                <p className="text-xs text-emerald-200 text-center mt-4 pt-4 border-t border-white/20">
+                  {formulaNote}
+                </p>
+              </motion.div>
+            )}
+          </div>
+
+          {/* Explanation card — shows ONLY when user is lump-sum-eligible but
+              doesn't qualify for monthly. Tells them exactly which condition
+              they don't meet so the missing บำนาญ card isn't a mystery. */}
+          {showExplanation && eligibility && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 text-white shadow-xl"
+              transition={{ delay: 0.25 }}
             >
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp size={20} />
-                <h3 className="font-semibold">เงินบำนาญรายเดือน</h3>
-              </div>
-              <div className="text-center py-4">
-                <AnimatedNumber
-                  value={result.monthly}
-                  decimals={2}
-                  className="text-4xl md:text-5xl font-bold block thai-num"
-                />
-                <p className="text-emerald-100 mt-2">บาท / เดือน</p>
-              </div>
-              <p className="text-xs text-emerald-200 text-center mt-4 pt-4 border-t border-white/20">
-                {formulaNote}
-              </p>
-            </motion.div>
-          </div>
+              <Card hover={false} elevation="e2">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <Info size={20} className="text-amber-700" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 mb-1">
+                      ทำไมได้รับเฉพาะบำเหน็จ?
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      อายุราชการ {eligibility.serviceYears.toFixed(1)} ปี ·
+                      อายุตัว ณ วันพ้น {eligibility.ageAtRetirement.toFixed(1)} ปี
+                    </p>
+                  </div>
+                </div>
 
-          {/* Livelihood Pension */}
-          {livelihood && (
+                <div className="space-y-3 text-sm leading-relaxed">
+                  <div className="flex items-start gap-2 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                    <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                      <Check size={12} className="text-emerald-600" strokeWidth={3} />
+                    </span>
+                    <p className="text-emerald-900">
+                      <span className="font-semibold">ได้รับ &quot;บำเหน็จ&quot;</span>{" "}
+                      เพราะอายุราชการ ≥ 10 ปี
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-3 bg-red-50 rounded-lg border border-red-100">
+                    <span className="mt-0.5 w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                      <X size={12} className="text-red-600" strokeWidth={3} />
+                    </span>
+                    <div className="text-red-900">
+                      <p className="font-semibold mb-1.5">
+                        ไม่ได้รับ &quot;บำนาญ&quot; เพราะไม่เข้าเงื่อนไขใดเลย
+                      </p>
+                      <ul className="space-y-1 text-xs text-red-700">
+                        <li>
+                          • อายุราชการ ≥ 25 ปี{" "}
+                          <span className="text-red-500">
+                            (ของคุณ {eligibility.serviceYears.toFixed(1)} ปี — ไม่ครบ)
+                          </span>
+                        </li>
+                        <li>
+                          • อายุตัว ≥ 50 ปี + อายุราชการ ≥ 10 ปี{" "}
+                          <span className="text-red-500">
+                            (อายุตัว {eligibility.ageAtRetirement.toFixed(1)} ปี — ไม่ครบ)
+                          </span>
+                        </li>
+                        <li>
+                          • เกษียณอายุราชการ (60 ปี) + อายุราชการ ≥ 10 ปี{" "}
+                          <span className="text-red-500">
+                            (อายุตัว {eligibility.ageAtRetirement.toFixed(1)} ปี — ยังไม่ถึง 60)
+                          </span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-3 bg-red-50 rounded-lg border border-red-100">
+                    <span className="mt-0.5 w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                      <X size={12} className="text-red-600" strokeWidth={3} />
+                    </span>
+                    <p className="text-red-900">
+                      <span className="font-semibold">
+                        ไม่ได้รับ &quot;บำเหน็จดำรงชีพ&quot;
+                      </span>{" "}
+                      เพราะสิทธิข้อนี้ผูกกับการรับ &quot;บำนาญ&quot; — ต้องได้บำนาญก่อน
+                      ถึงจะมีสิทธิรับบำเหน็จดำรงชีพ
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                    <Info size={14} className="mt-0.5 flex-shrink-0 text-blue-600" />
+                    <p className="text-blue-900 text-xs leading-relaxed">
+                      <span className="font-semibold">หมายเหตุ:</span>{" "}
+                      ไม่ว่ากรณีใด หากเป็นสมาชิก กบข.
+                      ท่านยังจะได้รับเงินจาก กบข. (เงินสะสม + เงินสมทบ + ผลประโยชน์)
+                      ตามที่สะสมไว้ — ระบบนี้ไม่ได้คำนวณส่วนนั้น
+                      โปรดตรวจสอบยอดได้ที่{" "}
+                      <a
+                        href="https://www.gpf.or.th/"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline font-medium"
+                      >
+                        gpf.or.th
+                      </a>
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Livelihood Pension — only when monthly-eligible (livelihood rides on monthly) */}
+          {monthlyEligible && livelihood && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -266,7 +397,10 @@ export default function ResultSection({
         );
       })()}
 
-      {/* Compare: Lump-Sum vs Monthly Pension — eligibility & benefits */}
+      {/* Compare: Lump-Sum vs Monthly Pension — eligibility & benefits.
+          Only shown when the user actually has a choice (monthly-eligible).
+          Otherwise the comparison would be misleading. */}
+      {monthlyEligible && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -391,6 +525,7 @@ export default function ResultSection({
           </div>
         </Card>
       </motion.div>
+      )}
 
       {/* Disclaimer */}
       <motion.div
