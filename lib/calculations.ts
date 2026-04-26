@@ -293,6 +293,14 @@ export function generateSalaryTable(
     firstRound = snapped;
   }
 
+  // 60-month window boundaries (calendar-precise). Computed early so they're
+  // available both for the override-staleness check below and the post-pass
+  // monthsInWindow calculation later.
+  const windowStart = new Date(endDate);
+  windowStart.setMonth(windowStart.getMonth() - 60);
+  const windowEnd = new Date(endDate);
+  windowEnd.setDate(windowEnd.getDate() - 1);
+
   let salary = currentSalary;
   let cursor = new Date(firstRound);
   let periodCount = 0;
@@ -308,8 +316,24 @@ export function generateSalaryTable(
         ? defaultBaseInfo
         : (getSalaryBaseForLevel(rowLevel, salaryBases) ?? defaultBaseInfo);
 
-    // Per-row effective-date override jumps the cursor for this row only
-    const rowDate = override?.effectiveDate ? new Date(override.effectiveDate) : cursor;
+    // Per-row effective-date override jumps the cursor for this row only.
+    // STALENESS GUARD: ignore overrides whose effectiveDate falls outside the
+    // current 60-month window. This handles the case where the user changed
+    // their exit date (window shifted) but old positional overrides from the
+    // previous window are still in salaryOverrides[]. Without this guard,
+    // the table would display stale dates that don't match the new window.
+    const rowDate = (() => {
+      if (!override?.effectiveDate) return cursor;
+      const od = new Date(override.effectiveDate);
+      if (isNaN(od.getTime())) return cursor;
+      if (
+        od.getTime() < windowStart.getTime() ||
+        od.getTime() > windowEnd.getTime()
+      ) {
+        return cursor;
+      }
+      return od;
+    })();
 
     // Round offset relative to snappedAssessment (in 6-month units):
     //   0  = the assessment-date round (latest raise = "ปัจจุบัน")
@@ -365,14 +389,10 @@ export function generateSalaryTable(
   }
 
   // Post-pass: compute monthsInWindow per row based on overlap with the
-  // 60-month averaging window [endDate − 60 mo, endDate − 1 day].
+  // 60-month averaging window [windowStart, windowEnd] (computed at the
+  // top of this function; reused here).
   // Each row's "fiscal period" = [period, nextRow.period − 1 day] (or
-  // [period, endDate − 1 day] for the last row).
-  const windowEnd = new Date(endDate);
-  windowEnd.setDate(windowEnd.getDate() - 1);
-  const windowStart = new Date(endDate);
-  windowStart.setMonth(windowStart.getMonth() - 60);
-
+  // [period, windowEnd] for the last row).
   const enriched: SalaryRecord[] = records.map((r, idx) => {
     const rowStart = new Date(r.period);
     let rowEnd: Date;
