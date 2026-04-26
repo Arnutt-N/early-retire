@@ -212,16 +212,17 @@ export interface SalaryRecord {
 }
 
 /**
- * Inclusive month count between two dates, rounded to nearest whole month.
- * Uses average month length (30.4375 days) — accurate for our day-aligned
- * fiscal-round boundaries (1 Apr / 1 Oct → 6 months) and partial spans
- * caused by non-fiscal exit dates (e.g. 1/6 - 30/9 → 4 months).
+ * Inclusive month count between two dates as a precise float — uses average
+ * month length (30.4375 days). Returns the raw value (NO rounding) so short
+ * partial periods (1-4 days from boundary+N exits like 2/4, 5/4, 2/10) keep
+ * their fractional weight in the avg-60 calculation. Display sites round
+ * for the badge ("X เดือน" / "X วัน") and total ("รวม X / 60 เดือน").
  */
 function monthsInRange(start: Date, end: Date): number {
   if (end.getTime() < start.getTime()) return 0;
   const dayMs = 1000 * 60 * 60 * 24;
   const days = Math.floor((end.getTime() - start.getTime()) / dayMs) + 1;
-  return Math.round(days / 30.4375);
+  return days / 30.4375;
 }
 
 export function generateSalaryTable(
@@ -400,6 +401,14 @@ export function generateSalaryTable(
     const markerDate = new Date(endDate);
     markerDate.setDate(markerDate.getDate() - 1);
 
+    // Skip marker creation when endDate − 1 day collides with the last actual
+    // row's period — happens when exit is exactly 1 day after a fiscal
+    // boundary (e.g. ลาออก 2/4 → marker would be 1/4, but that's already the
+    // last fiscal-round row). The last actual row already represents the
+    // day-before-exit; adding a duplicate would just confuse the table.
+    const lastRealPeriodMs = new Date(lastReal.period).getTime();
+    const skipMarker = markerDate.getTime() === lastRealPeriodMs;
+
     // Detect fiscal-boundary exit: endDate is exactly 1 April or 1 October.
     const exitDay = endDate.getDate();
     const exitMonth = endDate.getMonth(); // 0-based: 3 = Apr, 9 = Oct
@@ -444,24 +453,26 @@ export function generateSalaryTable(
       );
     }
 
-    enriched.push({
-      period: markerDate.toISOString(),
-      periodLabel: `${markerDate.getDate().toString().padStart(2, "0")}/${(
-        markerDate.getMonth() + 1
-      ).toString().padStart(2, "0")}/${toBE(markerDate.getFullYear())}`,
-      level: lastReal.level,
-      oldSalary: markerOldSalary,
-      maxSalary: lastReal.maxSalary,
-      base: markerBase,
-      percent: markerPercent,
-      increase: markerIncrease,
-      actualIncrease: markerActualIncrease,
-      newSalary: markerNewSalary,
-      isEstimated: false,
-      isCurrent: false,
-      monthsInWindow: markerMonthsInWindow,
-      isExitMarker: true,
-    });
+    if (!skipMarker) {
+      enriched.push({
+        period: markerDate.toISOString(),
+        periodLabel: `${markerDate.getDate().toString().padStart(2, "0")}/${(
+          markerDate.getMonth() + 1
+        ).toString().padStart(2, "0")}/${toBE(markerDate.getFullYear())}`,
+        level: lastReal.level,
+        oldSalary: markerOldSalary,
+        maxSalary: lastReal.maxSalary,
+        base: markerBase,
+        percent: markerPercent,
+        increase: markerIncrease,
+        actualIncrease: markerActualIncrease,
+        newSalary: markerNewSalary,
+        isEstimated: false,
+        isCurrent: false,
+        monthsInWindow: markerMonthsInWindow,
+        isExitMarker: true,
+      });
+    }
   }
 
   return enriched;
