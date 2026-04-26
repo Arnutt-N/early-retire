@@ -204,47 +204,49 @@ export default function ServicePeriodForm({ form, updateForm, onNext, onBack }: 
         )}
       </div>
 
-      {/* Leave Days */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-[var(--shadow-e2)] p-6 space-y-5">
-        <div className="flex items-center gap-2">
-          <Clock size={20} className="text-gray-500" />
-          <h3 className="font-semibold text-gray-900">หักวันลา</h3>
-          <span className="text-xs text-gray-500">(จะลบจากอายุราชการรวม)</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Input
-            label="ลาป่วย"
-            value={form.sickLeaveDays}
-            onChange={(v) => updateForm({ sickLeaveDays: parseInt(v) || 0 })}
-            type="number"
-            min={0}
-            suffix="วัน"
-          />
-          <Input
-            label="ลากิจ"
-            value={form.personalLeaveDays}
-            onChange={(v) => updateForm({ personalLeaveDays: parseInt(v) || 0 })}
-            type="number"
-            min={0}
-            suffix="วัน"
-          />
-          <Input
-            label="ลาพักผ่อน"
-            value={form.vacationDays}
-            onChange={(v) => updateForm({ vacationDays: parseInt(v) || 0 })}
-            type="number"
-            min={0}
-            suffix="วัน"
-          />
-        </div>
-        {leaveDays > 0 && (
-          <div className="flex items-center justify-center gap-2 p-3 bg-gray-50 rounded-xl">
-            <span className="text-sm text-gray-600">รวมวันลาทั้งหมด:</span>
-            <span className="text-lg font-bold text-gray-900">{leaveDays}</span>
-            <span className="text-sm text-gray-500">วัน</span>
+      {/* Leave Days — only when there's at least one multiplier period */}
+      {visiblePeriods.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-[var(--shadow-e2)] p-6 space-y-5">
+          <div className="flex items-center gap-2">
+            <Clock size={20} className="text-gray-500" />
+            <h3 className="font-semibold text-gray-900">หักวันลา</h3>
+            <span className="text-xs text-gray-500">(จะลบจากอายุราชการรวม)</span>
           </div>
-        )}
-      </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input
+              label="ลาป่วย"
+              value={form.sickLeaveDays}
+              onChange={(v) => updateForm({ sickLeaveDays: parseInt(v) || 0 })}
+              type="number"
+              min={0}
+              suffix="วัน"
+            />
+            <Input
+              label="ลากิจ"
+              value={form.personalLeaveDays}
+              onChange={(v) => updateForm({ personalLeaveDays: parseInt(v) || 0 })}
+              type="number"
+              min={0}
+              suffix="วัน"
+            />
+            <Input
+              label="ลาพักผ่อน"
+              value={form.vacationDays}
+              onChange={(v) => updateForm({ vacationDays: parseInt(v) || 0 })}
+              type="number"
+              min={0}
+              suffix="วัน"
+            />
+          </div>
+          {leaveDays > 0 && (
+            <div className="flex items-center justify-center gap-2 p-3 bg-gray-50 rounded-xl">
+              <span className="text-sm text-gray-600">รวมวันลาทั้งหมด:</span>
+              <span className="text-lg font-bold text-gray-900">{leaveDays}</span>
+              <span className="text-sm text-gray-500">วัน</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Navigation */}
       <div className="flex justify-between pt-4">

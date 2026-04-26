@@ -5,13 +5,14 @@ import DatePickerTH from "@/components/DatePickerTH";
 import Button from "@/components/ui/Button";
 import { calculateRetirementDate } from "@/lib/calculations";
 import { FormState } from "@/types";
-import { ChevronRight, User, Calendar, AlertCircle, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, User, Calendar, AlertCircle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
   form: FormState;
   updateForm: (updates: Partial<FormState>) => void;
   onNext: () => void;
+  onBack: () => void;
 }
 
 const retirementOptions = [
@@ -35,7 +36,7 @@ const retirementOptions = [
   },
 ] as const;
 
-export default function PersonalInfoForm({ form, updateForm, onNext }: Props) {
+export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: Props) {
   const handleRetirementOption = (option: FormState["retirementOption"]) => {
     updateForm({ retirementOption: option });
 
@@ -211,7 +212,15 @@ export default function PersonalInfoForm({ form, updateForm, onNext }: Props) {
       )}
 
       {/* Navigation */}
-      <div className="flex justify-end pt-4">
+      <div className="flex justify-between items-center pt-4 gap-3">
+        <Button
+          variant="outline"
+          onClick={onBack}
+          icon={<ChevronLeft size={18} />}
+          iconPosition="left"
+        >
+          กลับ
+        </Button>
         <Button
           onClick={onNext}
           disabled={!isValid || !endAfterStart}
