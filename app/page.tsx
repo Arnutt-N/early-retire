@@ -197,7 +197,6 @@ export default function Home() {
       form={form}
       updateForm={updateForm}
       records={salaryRecords}
-      salaryBases={salaryBases}
       onNext={goNext}
       onBack={goBack}
     />,

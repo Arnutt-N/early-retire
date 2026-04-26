@@ -47,7 +47,7 @@ export default function SalaryHistoryForm({ form, updateForm, onNext, onBack }: 
               ขั้นตอนที่ 4
             </span>
           </div>
-          <h2 className="text-xl md:text-2xl font-bold text-gray-900">ประวัติเลื่อนเงินเดือน</h2>
+          <h2 className="text-xl md:text-2xl font-bold text-gray-900">ประวัติเงินเดือน</h2>
           <p className="text-sm text-gray-500 mt-1">กรอกเงินเดือนปัจจุบันและประวัติ % การเลื่อนย้อนหลัง</p>
         </div>
       </div>
@@ -73,7 +73,7 @@ export default function SalaryHistoryForm({ form, updateForm, onNext, onBack }: 
       {/* Assessment Date */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-[var(--shadow-e2)] p-6">
         <CalendarPickerTH
-          label="วันที่รอบประเมินล่าสุด"
+          label="วันที่เลื่อนเงินเดือน ล่าสุด"
           value={form.latestAssessmentDate}
           onChange={(d) => updateForm({ latestAssessmentDate: d })}
           helper="ใช้เป็นจุดเริ่มในตารางคำนวณเงินเดือน (ไม่กำหนด = ใช้ 6 เดือนก่อนวันเกษียณ)"
@@ -127,7 +127,7 @@ export default function SalaryHistoryForm({ form, updateForm, onNext, onBack }: 
             </span>
           </div>
           <p className="text-xs text-emerald-600 mt-2">
-            ใช้เป็น default สำหรับรอบในอนาคตที่ยังไม่ทราบค่า
+            ใช้เป็นค่าเริ่มต้น สำหรับรอบในอนาคตที่ยังไม่ทราบค่า
           </p>
         </motion.div>
       </div>
