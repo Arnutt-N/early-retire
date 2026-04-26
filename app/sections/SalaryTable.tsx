@@ -71,8 +71,27 @@ export default function SalaryTableSection({
     (s, r) => s + r.monthsInWindow,
     0,
   );
-  const windowStartPeriod = rowsInWindow[0]?.period ?? null;
-  const windowEndPeriod = rowsInWindow[rowsInWindow.length - 1]?.period ?? null;
+  // Calendar-precise window boundaries (NOT the row.period, which snaps to
+  // fiscal-round starts). The summary card needs to show:
+  //   เริ่มนับ = exit − 60 calendar months (e.g. resign 1/6/2570 → 1/6/2565)
+  //   วันก่อนพ้น = exit − 1 day (e.g. exit 1/10/2585 → 30/9/2585)
+  const exitDate = form.endDate ? new Date(form.endDate) : null;
+  const windowStartCalendar =
+    exitDate && !isNaN(exitDate.getTime())
+      ? (() => {
+          const d = new Date(exitDate);
+          d.setMonth(d.getMonth() - 60);
+          return d.toISOString();
+        })()
+      : null;
+  const windowEndCalendar =
+    exitDate && !isNaN(exitDate.getTime())
+      ? (() => {
+          const d = new Date(exitDate);
+          d.setDate(d.getDate() - 1);
+          return d.toISOString();
+        })()
+      : null;
   const monthsShortBy = Math.max(0, 60 - totalMonthsInWindow);
   const windowComplete = totalMonthsInWindow >= 60;
   const totalRowMonths = records.length * 6;
@@ -98,7 +117,11 @@ export default function SalaryTableSection({
     updateForm({ latestAssessmentDate: next.toISOString() });
   };
 
-  const showExtendButton = isGfp && !windowComplete;
+  // Always show the "+ Add row backward" affordance in GFP mode (not gated on
+   // window-complete) so the user can keep extending history even after the
+   // 60-month window is full — useful for documenting earlier fiscal rounds
+   // they remember and want to override per-row.
+  const showExtendButton = isGfp && records.length > 0;
 
   // Per-row badge that tells the user whether this row is part of the 60-month
   // averaging window — and if partial, how many months it actually contributes.
@@ -240,7 +263,7 @@ export default function SalaryTableSection({
               </p>
             </div>
           </div>
-          {windowStartPeriod && windowEndPeriod && (
+          {windowStartCalendar && windowEndCalendar && (
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
               <div
                 className={cn(
@@ -262,7 +285,7 @@ export default function SalaryTableSection({
                     windowComplete ? "text-emerald-900" : "text-amber-900",
                   )}
                 >
-                  {formatThaiDate(windowStartPeriod)}
+                  {formatThaiDate(windowStartCalendar)}
                 </p>
               </div>
               <div
@@ -277,7 +300,7 @@ export default function SalaryTableSection({
                     windowComplete ? "text-emerald-600" : "text-amber-600",
                   )}
                 >
-                  สิ้นสุด (วันก่อนพ้นราชการ)
+                  วันก่อนพ้นราชการ
                 </p>
                 <p
                   className={cn(
@@ -285,23 +308,47 @@ export default function SalaryTableSection({
                     windowComplete ? "text-emerald-900" : "text-amber-900",
                   )}
                 >
-                  {formatThaiDate(windowEndPeriod)}
+                  {formatThaiDate(windowEndCalendar)}
                 </p>
               </div>
             </div>
           )}
 
           {showExtendButton && (
-            <div className="mt-4 pt-4 border-t border-amber-200">
-              <p className="text-xs text-amber-700 mb-2">
-                ขาดอีก <span className="font-semibold">{monthsShortBy} เดือน</span>{" "}
-                — กดปุ่มเพื่อเพิ่มแถวประวัติเงินเดือนย้อนหลัง 1 รอบ (6 เดือน)
-                แล้วแก้ไข % ของแถวใหม่ได้ที่ตารางด้านล่าง
+            <div
+              className={cn(
+                "mt-4 pt-4 border-t",
+                windowComplete ? "border-emerald-200" : "border-amber-200",
+              )}
+            >
+              <p
+                className={cn(
+                  "text-xs mb-2",
+                  windowComplete ? "text-emerald-700" : "text-amber-700",
+                )}
+              >
+                {windowComplete ? (
+                  <>
+                    ครบ 60 เดือนแล้ว — หากต้องการเพิ่มแถวประวัติเงินเดือนย้อนหลังเพิ่มเติม
+                    (เพื่อบันทึก % ของรอบเก่าๆ) คลิกปุ่มด้านล่าง
+                  </>
+                ) : (
+                  <>
+                    ขาดอีก <span className="font-semibold">{monthsShortBy} เดือน</span>{" "}
+                    — กดปุ่มเพื่อเพิ่มแถวประวัติเงินเดือนย้อนหลัง 1 รอบ (6 เดือน)
+                    แล้วแก้ไข % ของแถวใหม่ได้ที่ตารางด้านล่าง
+                  </>
+                )}
               </p>
               <button
                 type="button"
                 onClick={addRowBackward}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer focus:outline-none focus-visible:ring-2",
+                  windowComplete
+                    ? "bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-300"
+                    : "bg-amber-600 hover:bg-amber-700 focus-visible:ring-amber-300",
+                )}
               >
                 <Plus size={14} />
                 เพิ่มแถวประวัติย้อนหลัง 6 เดือน
@@ -769,6 +816,32 @@ export default function SalaryTableSection({
               );
             })}
           </div>
+
+          {/* Bottom "+ Add row" — duplicates the affordance from the summary
+              card so users who scrolled past the top can still extend history
+              without scrolling back up. GFP-only, always visible. */}
+          {showExtendButton && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={addRowBackward}
+                className={cn(
+                  "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed text-sm font-medium transition-colors cursor-pointer focus:outline-none focus-visible:ring-2",
+                  windowComplete
+                    ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 focus-visible:ring-emerald-300"
+                    : "border-amber-300 text-amber-700 hover:bg-amber-50 focus-visible:ring-amber-300",
+                )}
+              >
+                <Plus size={16} />
+                เพิ่มแถวประวัติย้อนหลัง 6 เดือน
+                {!windowComplete && (
+                  <span className="text-[11px] font-normal opacity-75">
+                    (ขาดอีก {monthsShortBy} เดือน)
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
         </>
       )}
 
