@@ -28,9 +28,9 @@ test.describe('Pension Calculator Smoke Tests', () => {
   }) => {
     await page.goto('/');
 
-    // Step 0: Mode Select — pick non-gfp
+    // Step 0: Mode Select — pick non-gfp (button text on Step 0 is "เริ่มคำนวณ")
     await page.getByRole('radio', { name: /ไม่เป็นสมาชิก กบข\./ }).click();
-    await page.locator('button:has-text("ถัดไป")').click();
+    await page.locator('button:has-text("เริ่มคำนวณ")').click();
     await page.waitForTimeout(400);
 
     // Step 1: Personal Info (3 date pickers always visible)
@@ -73,7 +73,7 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.waitForTimeout(500);
 
     // Step 5: Results — assert all 3 amounts shown
-    await expect(page.getByRole('heading', { name: 'ผลการคำนวณ' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'สรุปบำเหน็จบำนาญ' })).toBeVisible();
     await expect(page.locator('text=เงินบำเหน็จ')).toBeVisible();
     await expect(page.locator('text=เงินบำนาญรายเดือน')).toBeVisible();
     await expect(page.locator('text=บำเหน็จดำรงชีพ')).toBeVisible();
@@ -86,9 +86,9 @@ test.describe('Pension Calculator Smoke Tests', () => {
   }) => {
     await page.goto('/');
 
-    // Step 0: Mode Select — pick gfp
+    // Step 0: Mode Select — pick gfp (button text on Step 0 is "เริ่มคำนวณ")
     await page.getByRole('radio', { name: /^เป็นสมาชิก กบข\./ }).click();
-    await page.locator('button:has-text("ถัดไป")').click();
+    await page.locator('button:has-text("เริ่มคำนวณ")').click();
     await page.waitForTimeout(400);
 
     // Step 1
@@ -128,7 +128,7 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.waitForTimeout(500);
 
     // Step 5 — gfp shows the same 3 amounts (computed differently)
-    await expect(page.getByRole('heading', { name: 'ผลการคำนวณ' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'สรุปบำเหน็จบำนาญ' })).toBeVisible();
     await expect(page.locator('text=เงินบำเหน็จ')).toBeVisible();
     await expect(page.locator('text=เงินบำนาญรายเดือน')).toBeVisible();
     await expect(page.locator('text=บำเหน็จดำรงชีพ')).toBeVisible();
@@ -136,8 +136,8 @@ test.describe('Pension Calculator Smoke Tests', () => {
 
   test('mode selection gates progression', async ({ page }) => {
     await page.goto('/');
-    // Without picking a mode, the ถัดไป button should be disabled
-    const nextBtn = page.locator('button:has-text("ถัดไป")');
+    // Without picking a mode, the Step-0 CTA button should be disabled
+    const nextBtn = page.locator('button:has-text("เริ่มคำนวณ")');
     await expect(nextBtn).toBeDisabled();
 
     // After picking, it enables
@@ -167,7 +167,7 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await expect(
       page.getByRole('heading', { name: /คุณเป็นสมาชิก กบข\./ }),
     ).toBeVisible();
-    // The ถัดไป button must be disabled because no mode is selected (proof saved mode='gfp' was discarded)
-    await expect(page.locator('button:has-text("ถัดไป")')).toBeDisabled();
+    // The Step-0 CTA must be disabled because no mode is selected (proof saved mode='gfp' was discarded)
+    await expect(page.locator('button:has-text("เริ่มคำนวณ")')).toBeDisabled();
   });
 });

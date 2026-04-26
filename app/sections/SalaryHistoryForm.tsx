@@ -6,7 +6,8 @@ import type { FormState } from "@/types";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import CalendarPickerTH from "@/components/ui/CalendarPickerTH";
-import { TrendingUp, DollarSign } from "lucide-react";
+import { TrendingUp, DollarSign, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Props {
   form: FormState;
@@ -17,7 +18,7 @@ interface Props {
 
 export default function SalaryHistoryForm({ form, updateForm, onNext, onBack }: Props) {
   const avgPercent = useMemo(() => {
-    const vals = form.assessmentIncreases.filter((v) => !isNaN(v));
+    const vals = form.assessmentIncreases.filter((v) => !isNaN(v) && v > 0);
     if (vals.length === 0) return 0;
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   }, [form.assessmentIncreases]);
@@ -33,70 +34,110 @@ export default function SalaryHistoryForm({ form, updateForm, onNext, onBack }: 
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="space-y-6"
+      className="space-y-8"
     >
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center">
-          <DollarSign size={20} />
+      {/* Header */}
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg">
+          <DollarSign size={24} />
         </div>
-        <div>
-          <h2 className="text-xl font-bold">ประวัติเลื่อนเงินเดือน</h2>
-          <p className="text-sm text-gray-500">
-            กรอกเงินเดือนปัจจุบันและประวัติ % การเลื่อนย้อนหลัง
-          </p>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2.5 py-0.5 text-xs font-medium bg-emerald-50 text-emerald-600 rounded-full">
+              ขั้นตอนที่ 4
+            </span>
+          </div>
+          <h2 className="text-xl md:text-2xl font-bold text-gray-900">ประวัติเลื่อนเงินเดือน</h2>
+          <p className="text-sm text-gray-500 mt-1">กรอกเงินเดือนปัจจุบันและประวัติ % การเลื่อนย้อนหลัง</p>
         </div>
       </div>
 
-      <Input
-        label="เงินเดือนปัจจุบัน"
-        value={form.currentSalary}
-        onChange={(v) => updateForm({ currentSalary: parseFloat(v) || 0 })}
-        type="number"
-        required
-        suffix="บาท"
-      />
+      {/* Current Salary Card */}
+      <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 text-white shadow-lg">
+        <div className="flex items-center gap-2 mb-4">
+          <DollarSign size={20} />
+          <h3 className="font-semibold">เงินเดือนปัจจุบัน</h3>
+        </div>
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+          <Input
+            value={form.currentSalary}
+            onChange={(v) => updateForm({ currentSalary: parseFloat(v) || 0 })}
+            type="number"
+            required
+            suffix="บาท"
+            className="!bg-white/90 !border-0 !text-gray-900 text-xl font-bold"
+          />
+        </div>
+      </div>
 
-      <CalendarPickerTH
-        label="วันที่รอบประเมินล่าสุด"
-        value={form.latestAssessmentDate}
-        onChange={(d) => updateForm({ latestAssessmentDate: d })}
-        helper="ใช้เป็นจุดเริ่มในตารางคำนวณเงินเดือน (ไม่กำหนด = ใช้ 6 เดือนก่อนวันเกษียณ)"
-      />
+      {/* Assessment Date */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-[var(--shadow-e2)] p-6">
+        <CalendarPickerTH
+          label="วันที่รอบประเมินล่าสุด"
+          value={form.latestAssessmentDate}
+          onChange={(d) => updateForm({ latestAssessmentDate: d })}
+          helper="ใช้เป็นจุดเริ่มในตารางคำนวณเงินเดือน (ไม่กำหนด = ใช้ 6 เดือนก่อนวันเกษียณ)"
+        />
+      </div>
 
-      <div className="space-y-3">
-        <h3 className="font-semibold flex items-center gap-2">
-          <TrendingUp size={18} />
-          % การเลื่อนเงินเดือนย้อนหลัง (6 รอบ)
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {/* Assessment History */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-[var(--shadow-e2)] p-6 space-y-5">
+        <div className="flex items-center gap-2">
+          <TrendingUp size={20} className="text-gray-500" />
+          <h3 className="font-semibold text-gray-900">% การเลื่อนเงินเดือนย้อนหลัง (6 รอบ)</h3>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {form.assessmentIncreases.map((val, i) => (
-            <Input
+            <motion.div
               key={i}
-              label={`รอบที่ ${i + 1}`}
-              value={val}
-              onChange={(v) => updateAssessment(i, v)}
-              type="number"
-              step={0.1}
-              suffix="%"
-            />
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+            >
+              <Input
+                label={`รอบที่ ${i + 1}`}
+                value={val}
+                onChange={(v) => updateAssessment(i, v)}
+                type="number"
+                step={0.1}
+                suffix="%"
+                className={cn(
+                  val > 0 && "!border-emerald-200 !bg-emerald-50/30"
+                )}
+              />
+            </motion.div>
           ))}
         </div>
-        <div className="bg-green-50 border border-green-100 rounded-xl p-3">
-          <p className="text-sm text-green-800">
-            ค่าเฉลี่ยการเลื่อนเงินเดือน:{" "}
-            <span className="font-bold">{avgPercent.toFixed(1)}%</span>
-            <span className="text-green-600 ml-2">
-              (ใช้เป็น default สำหรับรอบในอนาคตที่ยังไม่ทราบ)
+
+        {/* Average Summary */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-4"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles size={18} className="text-emerald-500" />
+              <span className="text-sm text-emerald-800">ค่าเฉลี่ยการเลื่อนเงินเดือน</span>
+            </div>
+            <span className="text-xl font-bold text-emerald-600">
+              {avgPercent.toFixed(2)}%
             </span>
+          </div>
+          <p className="text-xs text-emerald-600 mt-2">
+            ใช้เป็น default สำหรับรอบในอนาคตที่ยังไม่ทราบค่า
           </p>
-        </div>
+        </motion.div>
       </div>
 
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onBack}>
+      {/* Navigation */}
+      <div className="flex justify-between pt-4">
+        <Button variant="outline" onClick={onBack} icon={<ChevronLeft size={18} />} iconPosition="left">
           กลับ
         </Button>
-        <Button onClick={onNext} icon={<TrendingUp size={18} />}>
+        <Button onClick={onNext} icon={<ChevronRight size={18} />}>
           ถัดไป
         </Button>
       </div>
