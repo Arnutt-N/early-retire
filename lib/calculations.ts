@@ -321,7 +321,12 @@ export function generateSalaryTable(
     const cappedNewSalary =
       newSalary > rowBaseInfo.fullSalary ? rowBaseInfo.fullSalary : newSalary;
 
-    const isCurrent = periodCount === 0;
+    // "ปัจจุบัน" badge marks the row whose fiscal-round date matches the
+    // user's latest salary-increase date. For GFP scenarios the table can
+    // extend back beyond the assessment (windowStart < assessment), so
+    // the first row in the table is OLDER than the assessment — using
+    // `periodCount === 0` would mislabel the wrong row.
+    const isCurrent = cursor.getTime() === snappedAssessment.getTime();
     const isEstimated = periodCount >= increases.length;
 
     records.push({

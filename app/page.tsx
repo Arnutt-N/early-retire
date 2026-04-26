@@ -187,9 +187,15 @@ export default function Home() {
   const goNext = () => setStep((s) => Math.min(s + 1, 5));
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
-  // Eligibility check: Thai civil-servant pension rule = service ≥ 10 years
-  // for any lump-sum/pension entitlement. Below that, only the personal GFP
-  // balance is returned (for GFP members).
+  // Eligibility check: Thai civil-servant pension rules
+  //   • บำเหน็จ (lump sum): service ≥ 10 years
+  //   • บำนาญ (monthly pension): EITHER
+  //       - service ≥ 25 years, OR
+  //       - service ≥ 10 AND age ≥ 50 (covers retirement at 60 implicitly)
+  //   • บำเหน็จดำรงชีพ (livelihood): only when entitled to บำนาญ (riding on it)
+  // Below 10 years of service, no บำเหน็จ/บำนาญ — only the personal GFP
+  // balance is returned (for GFP members). NOTE: GFP balance applies to
+  // ALL cases as a separate item; this calculator does not compute it.
   const eligibilityKey = `${form.birthDate ?? ""}|${form.startDate ?? ""}|${form.endDate ?? ""}`;
   const eligibilityCheck = useMemo(() => {
     if (!form.birthDate || !form.startDate || !form.endDate) return null;
@@ -206,10 +212,15 @@ export default function Home() {
     const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
     const serviceYears = (end.getTime() - start.getTime()) / msPerYear;
     const ageAtRetirement = (end.getTime() - birth.getTime()) / msPerYear;
+    const eligibleForLumpSum = serviceYears >= 10;
+    const eligibleForMonthly =
+      eligibleForLumpSum && (serviceYears >= 25 || ageAtRetirement >= 50);
     return {
       serviceYears,
       ageAtRetirement,
-      eligible: serviceYears >= 10,
+      eligible: eligibleForLumpSum,
+      eligibleForLumpSum,
+      eligibleForMonthly,
     };
   }, [form.birthDate, form.startDate, form.endDate]);
 
@@ -285,6 +296,7 @@ export default function Home() {
       result={result}
       livelihood={livelihood}
       salaryRecords={salaryRecords}
+      eligibility={eligibilityCheck}
       onBack={goBack}
     />,
   ];
