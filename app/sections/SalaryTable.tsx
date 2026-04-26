@@ -60,27 +60,32 @@ export default function SalaryTableSection({
     if (editingIdx === idx) setEditingIdx(null);
   };
 
-  const totalMonths = records.length * 6;
-  const subtitle =
-    form.mode === "gfp"
-      ? `${records.length} รอบ × 6 เดือน = ${totalMonths} เดือน — ขั้นต่ำ 60 เดือนสุดท้าย หรือถึงวันเลื่อนเงินเดือนล่าสุด แล้วแต่ระยะใดยาวกว่า`
-      : `วันเลื่อนเงินเดือนล่าสุด → วันก่อนพ้นราชการ (${records.length} รอบ × 6 เดือน = ${totalMonths} เดือน)`;
+  const isGfp = form.mode === "gfp";
 
-  // 60-month window used for the GFP averaging formula = STRICTLY the last 10 rounds.
-  // The table itself can extend further back (so users can edit historical %),
-  // but the average for the pension formula only uses last10.
-  const last10 = records.slice(-10);
-  const last10Count = last10.length;
-  const last10StartPeriod = last10[0]?.period ?? null;
-  const last10EndPeriod = last10[last10Count - 1]?.period ?? null;
-  const last10TotalMonths = last10Count * 6;
+  // 60-month averaging window for GFP. Each row contributes its monthsInWindow
+  // (6 = full fiscal round inside, 1-5 = partial boundary, 0 = outside).
+  // The displayed table may extend further back so users can edit older history,
+  // but only rows with monthsInWindow > 0 feed the avg-60 formula.
+  const rowsInWindow = records.filter((r) => r.monthsInWindow > 0);
+  const totalMonthsInWindow = records.reduce(
+    (s, r) => s + r.monthsInWindow,
+    0,
+  );
+  const windowStartPeriod = rowsInWindow[0]?.period ?? null;
+  const windowEndPeriod = rowsInWindow[rowsInWindow.length - 1]?.period ?? null;
+  const monthsShortBy = Math.max(0, 60 - totalMonthsInWindow);
+  const windowComplete = totalMonthsInWindow >= 60;
+  const totalRowMonths = records.length * 6;
 
-  // "Extend window backward" — push latestAssessmentDate back one round (6 months)
-  // so generateSalaryTable produces one more historical row. Useful when the
-  // GFP table somehow has < 10 rounds (very short career edge case) or when
-  // the user wants to inspect an extra historical assessment.
-  const extendWindowBack = () => {
-    // Anchor for the extension: current first row's period, fall back to today.
+  const subtitle = isGfp
+    ? `รวม ${totalMonthsInWindow} / 60 เดือน ใน ${rowsInWindow.length} แถวที่นับ — สูตร กบข. ใช้ค่าเฉลี่ย 60 เดือนสุดท้ายก่อนพ้นราชการ`
+    : `วันเลื่อนเงินเดือนล่าสุด → วันก่อนพ้นราชการ (${records.length} รอบ × 6 เดือน = ${totalRowMonths} เดือน)`;
+
+  // "Add a row backward" — push latestAssessmentDate back one fiscal round
+  // (6 months) so generateSalaryTable adds one more historical row. Used when
+  // total months < 60 (e.g. short career or window edge case) or the user
+  // wants to manually inspect/edit an extra historical assessment.
+  const addRowBackward = () => {
     const firstPeriod = records[0]?.period ?? null;
     const anchor = firstPeriod
       ? new Date(firstPeriod)
@@ -93,8 +98,42 @@ export default function SalaryTableSection({
     updateForm({ latestAssessmentDate: next.toISOString() });
   };
 
-  const isGfp = form.mode === "gfp";
-  const showExtendButton = isGfp && last10Count < 10;
+  const showExtendButton = isGfp && !windowComplete;
+
+  // Per-row badge that tells the user whether this row is part of the 60-month
+  // averaging window — and if partial, how many months it actually contributes.
+  // Hidden for non-GFP (the formula uses last salary only, not an average).
+  const renderMonthsBadge = (months: number) => {
+    if (!isGfp) return null;
+    if (months === 0) {
+      return (
+        <span
+          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 rounded"
+          title="แถวนี้อยู่นอกช่วง 60 เดือนเฉลี่ย — ไม่ถูกนับเข้าค่าเฉลี่ย กบข."
+        >
+          ไม่นับ
+        </span>
+      );
+    }
+    const isPartial = months < 6;
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded",
+          isPartial
+            ? "bg-amber-100 text-amber-700"
+            : "bg-emerald-100 text-emerald-700",
+        )}
+        title={
+          isPartial
+            ? `แถวคาบเกี่ยวขอบช่วง 60 เดือน — นับเข้าค่าเฉลี่ยเพียง ${months} เดือน`
+            : "นับเต็ม 6 เดือนในช่วง 60 เดือนเฉลี่ย"
+        }
+      >
+        {months} เดือน
+      </span>
+    );
+  };
 
   return (
     <motion.div
@@ -143,41 +182,110 @@ export default function SalaryTableSection({
         </select>
       </div>
 
-      {/* 60-month calculation window — GFP only. Tells the user exactly which
-          rounds feed the บำนาญ averaging formula (= last 10 rounds = 60 months),
-          even when the table itself extends further back for historical edits. */}
+      {/* 60-month calculation window — GFP only. Shows the exact months feeding
+          the บำนาญ averaging formula. Each row in the table below carries a
+          "X เดือน" badge so users can visually verify the total = 60. */}
       {isGfp && records.length > 0 && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5">
+        <div
+          className={cn(
+            "rounded-2xl p-5 border bg-gradient-to-r",
+            windowComplete
+              ? "from-emerald-50 to-green-50 border-emerald-200"
+              : "from-amber-50 to-orange-50 border-amber-200",
+          )}
+        >
           <div className="flex items-start gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-              <CalendarRange size={20} className="text-amber-700" />
+            <div
+              className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
+                windowComplete ? "bg-emerald-100" : "bg-amber-100",
+              )}
+            >
+              <CalendarRange
+                size={20}
+                className={windowComplete ? "text-emerald-700" : "text-amber-700"}
+              />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-amber-900 mb-1">
-                ช่วง {last10TotalMonths} เดือน ที่ใช้คำนวณบำนาญ
-              </h3>
-              <p className="text-xs text-amber-700 leading-relaxed">
-                สูตร กบข. ใช้ค่าเฉลี่ยเงินเดือน 60 เดือนสุดท้ายก่อนพ้นราชการ
-                (ตารางด้านล่างอาจแสดงรอบเพิ่มเพื่อให้แก้ไขประวัติได้ — แต่การคำนวณใช้เฉพาะ {last10Count} รอบล่าสุด)
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <h3
+                  className={cn(
+                    "text-sm font-semibold",
+                    windowComplete ? "text-emerald-900" : "text-amber-900",
+                  )}
+                >
+                  ช่วงคำนวณบำนาญ — รวม {totalMonthsInWindow} / 60 เดือน
+                </h3>
+                {windowComplete ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-600 text-white">
+                    <Check size={10} />
+                    ครบ
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-600 text-white">
+                    <AlertCircle size={10} />
+                    ขาด {monthsShortBy} เดือน
+                  </span>
+                )}
+              </div>
+              <p
+                className={cn(
+                  "text-xs leading-relaxed",
+                  windowComplete ? "text-emerald-700" : "text-amber-700",
+                )}
+              >
+                สูตร กบข. ใช้ค่าเฉลี่ยเงินเดือน 60 เดือนสุดท้ายก่อนพ้นราชการ —
+                แถวที่ติดป้าย <span className="font-semibold">&quot;X เดือน&quot;</span>{" "}
+                คือแถวที่นับเข้าค่าเฉลี่ย
               </p>
             </div>
           </div>
-          {last10StartPeriod && last10EndPeriod && (
-            <div className="grid grid-cols-2 gap-2 sm:gap-4 pl-13">
-              <div className="bg-white/70 rounded-lg px-3 py-2 border border-amber-100">
-                <p className="text-[10px] uppercase tracking-wide text-amber-600 font-medium mb-0.5">
-                  เริ่มต้น
+          {windowStartPeriod && windowEndPeriod && (
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+              <div
+                className={cn(
+                  "bg-white/70 rounded-lg px-3 py-2 border",
+                  windowComplete ? "border-emerald-100" : "border-amber-100",
+                )}
+              >
+                <p
+                  className={cn(
+                    "text-[10px] uppercase tracking-wide font-medium mb-0.5",
+                    windowComplete ? "text-emerald-600" : "text-amber-600",
+                  )}
+                >
+                  เริ่มนับ
                 </p>
-                <p className="text-sm font-bold text-amber-900 tabular-nums">
-                  {formatThaiDate(last10StartPeriod)}
+                <p
+                  className={cn(
+                    "text-sm font-bold tabular-nums",
+                    windowComplete ? "text-emerald-900" : "text-amber-900",
+                  )}
+                >
+                  {formatThaiDate(windowStartPeriod)}
                 </p>
               </div>
-              <div className="bg-white/70 rounded-lg px-3 py-2 border border-amber-100">
-                <p className="text-[10px] uppercase tracking-wide text-amber-600 font-medium mb-0.5">
+              <div
+                className={cn(
+                  "bg-white/70 rounded-lg px-3 py-2 border",
+                  windowComplete ? "border-emerald-100" : "border-amber-100",
+                )}
+              >
+                <p
+                  className={cn(
+                    "text-[10px] uppercase tracking-wide font-medium mb-0.5",
+                    windowComplete ? "text-emerald-600" : "text-amber-600",
+                  )}
+                >
                   สิ้นสุด (วันก่อนพ้นราชการ)
                 </p>
-                <p className="text-sm font-bold text-amber-900 tabular-nums">
-                  {formatThaiDate(last10EndPeriod)}
+                <p
+                  className={cn(
+                    "text-sm font-bold tabular-nums",
+                    windowComplete ? "text-emerald-900" : "text-amber-900",
+                  )}
+                >
+                  {formatThaiDate(windowEndPeriod)}
                 </p>
               </div>
             </div>
@@ -186,16 +294,17 @@ export default function SalaryTableSection({
           {showExtendButton && (
             <div className="mt-4 pt-4 border-t border-amber-200">
               <p className="text-xs text-amber-700 mb-2">
-                ตอนนี้ตารางมีเพียง {last10Count} รอบ ({last10TotalMonths} เดือน)
-                — น้อยกว่า 60 เดือน หากต้องการเพิ่มรอบย้อนหลังเพื่อให้ครบ คลิกปุ่มด้านล่าง
+                ขาดอีก <span className="font-semibold">{monthsShortBy} เดือน</span>{" "}
+                — กดปุ่มเพื่อเพิ่มแถวประวัติเงินเดือนย้อนหลัง 1 รอบ (6 เดือน)
+                แล้วแก้ไข % ของแถวใหม่ได้ที่ตารางด้านล่าง
               </p>
               <button
                 type="button"
-                onClick={extendWindowBack}
+                onClick={addRowBackward}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
               >
                 <Plus size={14} />
-                เพิ่มรอบย้อนหลัง 6 เดือน
+                เพิ่มแถวประวัติย้อนหลัง 6 เดือน
               </button>
             </div>
           )}
@@ -297,6 +406,7 @@ export default function SalaryTableSection({
                                   ประมาณ
                                 </span>
                               )}
+                              {renderMonthsBadge(r.monthsInWindow)}
                             </div>
                           )}
                         </td>
@@ -499,6 +609,7 @@ export default function SalaryTableSection({
                             ประมาณ
                           </span>
                         )}
+                        {renderMonthsBadge(r.monthsInWindow)}
                       </div>
                     </div>
                     <span className="text-[11px] tabular-nums text-gray-600 font-medium">

@@ -156,11 +156,19 @@ export default function Home() {
 
   const avg60Months = useMemo(() => {
     if (salaryRecords.length === 0) return 0;
-    // Per Thai GFP rule: strict average of LAST 60 months (10 rounds × 6 mo) — even
-    // when the displayed table extends further back to cover historical assessments.
-    const last60 = salaryRecords.slice(-10);
-    const total = last60.reduce((s, r) => s + r.newSalary, 0);
-    return total / last60.length;
+    // Per Thai GFP rule: average of LAST 60 months. Weighted by each row's
+    // monthsInWindow so partial boundary rows (e.g. resignation on a non-fiscal
+    // date producing a 4-month first row + 2-month last row) contribute their
+    // exact share. Rows with monthsInWindow = 0 (outside window) drop out.
+    const sumWeighted = salaryRecords.reduce(
+      (s, r) => s + r.newSalary * r.monthsInWindow,
+      0,
+    );
+    const totalMonths = salaryRecords.reduce(
+      (s, r) => s + r.monthsInWindow,
+      0,
+    );
+    return totalMonths > 0 ? sumWeighted / totalMonths : 0;
   }, [salaryRecords]);
 
   const result = useMemo(() => {
