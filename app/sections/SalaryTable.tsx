@@ -67,10 +67,15 @@ export default function SalaryTableSection({
   // The displayed table may extend further back so users can edit older history,
   // but only rows with monthsInWindow > 0 feed the avg-60 formula.
   const rowsInWindow = records.filter((r) => r.monthsInWindow > 0);
-  const totalMonthsInWindow = records.reduce(
+  // Sum can carry tiny float error when the day-before-exit raise is
+  // included (1/30.4375 stolen from the previous row). Round to integer
+  // months for display and "ครบ/ขาด" comparison — internal calcs (avg60
+  // weighted average in app/page.tsx) still use the precise float values.
+  const rawTotalMonths = records.reduce(
     (s, r) => s + r.monthsInWindow,
     0,
   );
+  const totalMonthsInWindow = Math.round(rawTotalMonths);
   // Calendar-precise window boundaries (NOT the row.period, which snaps to
   // fiscal-round starts). The summary card needs to show:
   //   เริ่มนับ = exit − 60 calendar months (e.g. resign 1/6/2570 → 1/6/2565)
@@ -123,7 +128,21 @@ export default function SalaryTableSection({
         </span>
       );
     }
-    const isPartial = months < 6;
+    // Sub-month contribution (e.g. day-before-exit raise = 1 day) → display
+    // as "X วัน" with the indigo "raise marker" treatment.
+    if (months < 1) {
+      const days = Math.max(1, Math.round(months * 30.4375));
+      return (
+        <span
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded"
+          title={`นับเข้าค่าเฉลี่ย ${days} วัน — เลื่อนเงินเดือน 1 วันก่อนพ้นราชการ`}
+        >
+          {days} วัน
+        </span>
+      );
+    }
+    const intMonths = Math.round(months);
+    const isPartial = intMonths < 6;
     return (
       <span
         className={cn(
@@ -134,11 +153,11 @@ export default function SalaryTableSection({
         )}
         title={
           isPartial
-            ? `แถวคาบเกี่ยวขอบช่วง 60 เดือน — นับเข้าค่าเฉลี่ยเพียง ${months} เดือน`
+            ? `แถวคาบเกี่ยวขอบช่วง 60 เดือน — นับเข้าค่าเฉลี่ยเพียง ${intMonths} เดือน`
             : "นับเต็ม 6 เดือนในช่วง 60 เดือนเฉลี่ย"
         }
       >
-        {months} เดือน
+        {intMonths} เดือน
       </span>
     );
   };
@@ -377,6 +396,11 @@ export default function SalaryTableSection({
                     // Not editable, no pencil/trash. For non-GFP it's prominent
                     // (this IS the salary used by the lump-sum / monthly formula).
                     if (r.isExitMarker) {
+                      // When exit is on a fiscal boundary (1/4 or 1/10), the
+                      // marker carries an actual 1-day raise — show its full
+                      // numeric breakdown. Otherwise the row is informational
+                      // and numeric cells are dashed out.
+                      const hasRaise = r.actualIncrease > 0;
                       return (
                         <tr
                           key={i}
@@ -399,7 +423,9 @@ export default function SalaryTableSection({
                                 )}
                                 title={
                                   isGfp
-                                    ? "วันก่อนพ้นราชการ — ไม่ถูกนับเข้าค่าเฉลี่ย 60 เดือน"
+                                    ? hasRaise
+                                      ? "วันก่อนพ้นราชการ — เลื่อนเงินเดือน 1 วัน ก่อนเกษียณ (นับใน 60 เดือน)"
+                                      : "วันก่อนพ้นราชการ — ไม่ถูกนับเข้าค่าเฉลี่ย 60 เดือน"
                                     : "วันก่อนพ้นราชการ — เงินเดือนสุดท้ายที่ใช้คำนวณ"
                                 }
                               >
@@ -414,17 +440,32 @@ export default function SalaryTableSection({
                                   เงินเดือนสุดท้าย
                                 </span>
                               )}
+                              {isGfp && hasRaise && renderMonthsBadge(r.monthsInWindow)}
                             </div>
                           </td>
                           <td className="px-3 py-2.5 align-middle min-w-[160px] text-gray-600">
                             {LEVEL_DISPLAY_ORDER.find((l) => l.value === r.level)
                               ?.label ?? r.level}
                           </td>
-                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-400">—</td>
-                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-400">—</td>
-                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-400">—</td>
-                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-400">—</td>
-                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-400">—</td>
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums">
+                            {hasRaise ? formatNumber(r.oldSalary) : <span className="text-gray-400">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-500">
+                            {hasRaise ? formatNumber(r.maxSalary) : <span className="text-gray-400">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-500">
+                            {hasRaise ? formatNumber(r.base) : <span className="text-gray-400">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums">
+                            {hasRaise ? (
+                              <span className="font-medium text-gray-800">{r.percent.toFixed(2)}%</span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-emerald-600 font-semibold">
+                            {hasRaise ? `+${formatNumber(r.actualIncrease)}` : <span className="text-gray-400">—</span>}
+                          </td>
                           <td
                             className={cn(
                               "px-3 py-2.5 align-middle text-right tabular-nums font-bold",

@@ -207,19 +207,21 @@ export default function ResultSection({
 
       {/* Salary Summary */}
       {salaryRecords.length > 0 && (() => {
-        // Filter out the synthetic exit-marker row from stats — it doesn't
-        // represent an actual salary round, only the day-before-exit display.
+        // Real fiscal rounds only (exclude the synthetic exit-marker for the
+        // "จำนวนรอบ" / "เงินเดือนเริ่มต้น" displays).
         const realRecords = salaryRecords.filter((r) => !r.isExitMarker);
-        const lastRow = realRecords[realRecords.length - 1] ?? null;
-        // GFP uses weighted-by-monthsInWindow average to match the formula
-        // (handles partial boundary rows correctly). Non-GFP doesn't use this
-        // stat. Falls back to a naive mean when monthsInWindow is unavailable
-        // (shouldn't happen, but defensive).
-        const totalMonthsInWindow = realRecords.reduce(
+        // Last salary = marker's newSalary (includes the day-before-exit raise
+        // when retirement falls on a fiscal boundary). For non-GFP this is
+        // the value the formula actually uses.
+        const lastSalaryRow = salaryRecords[salaryRecords.length - 1] ?? null;
+        // เงินเฉลี่ย 60 เดือน — weighted average over ALL rows (real rounds +
+        // marker if it carries a 1-day raise weight). Matches the GFP formula
+        // exactly. Falls back to naive mean only if monthsInWindow is all 0.
+        const totalMonthsInWindow = salaryRecords.reduce(
           (s, r) => s + r.monthsInWindow,
           0,
         );
-        const sumWeighted = realRecords.reduce(
+        const sumWeighted = salaryRecords.reduce(
           (s, r) => s + r.newSalary * r.monthsInWindow,
           0,
         );
@@ -248,7 +250,7 @@ export default function ResultSection({
               <div className="p-3 bg-gray-50 rounded-xl">
                 <p className="text-xs text-gray-500 mb-1">เงินเดือนสุดท้าย</p>
                 <p className="font-bold text-gray-900">
-                  {formatNumber(lastRow?.newSalary || 0)}
+                  {formatNumber(lastSalaryRow?.newSalary || 0)}
                 </p>
               </div>
               {mode === "gfp" && (
