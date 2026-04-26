@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import ProgressBar from "@/components/ProgressBar";
 import Footer from "@/components/Footer";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import ModeSelect from "./sections/ModeSelect";
 import PersonalInfoForm from "./sections/PersonalInfoForm";
 import ServicePeriodForm from "./sections/ServicePeriodForm";
@@ -81,6 +82,11 @@ function loadInitialForm(): FormState {
 export default function Home() {
   const [form, setForm] = useState<FormState>(loadInitialForm);
   const [step, setStep] = useState(0);
+  const [resetOpen, setResetOpen] = useState(false);
+  // Track which (birth|start|end) combination the user last dismissed the
+  // eligibility warning for. If they edit dates back to ineligible the modal
+  // resurfaces because the key changes.
+  const [eligibilityAckedKey, setEligibilityAckedKey] = useState<string | null>(null);
 
   const updateForm = (updates: Partial<FormState>) => {
     setForm((prev) => {
@@ -150,8 +156,11 @@ export default function Home() {
 
   const avg60Months = useMemo(() => {
     if (salaryRecords.length === 0) return 0;
-    const total = salaryRecords.reduce((s, r) => s + r.newSalary, 0);
-    return total / salaryRecords.length;
+    // Per Thai GFP rule: strict average of LAST 60 months (10 rounds × 6 mo) — even
+    // when the displayed table extends further back to cover historical assessments.
+    const last60 = salaryRecords.slice(-10);
+    const total = last60.reduce((s, r) => s + r.newSalary, 0);
+    return total / last60.length;
   }, [salaryRecords]);
 
   const result = useMemo(() => {
@@ -170,12 +179,40 @@ export default function Home() {
   const goNext = () => setStep((s) => Math.min(s + 1, 5));
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
-  const handleReset = () => {
+  // Eligibility check: Thai civil-servant pension rule = service ≥ 10 years
+  // for any lump-sum/pension entitlement. Below that, only the personal GFP
+  // balance is returned (for GFP members).
+  const eligibilityKey = `${form.birthDate ?? ""}|${form.startDate ?? ""}|${form.endDate ?? ""}`;
+  const eligibilityCheck = useMemo(() => {
+    if (!form.birthDate || !form.startDate || !form.endDate) return null;
+    const birth = new Date(form.birthDate);
+    const start = new Date(form.startDate);
+    const end = new Date(form.endDate);
+    if (
+      isNaN(birth.getTime()) ||
+      isNaN(start.getTime()) ||
+      isNaN(end.getTime())
+    ) {
+      return null;
+    }
+    const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
+    const serviceYears = (end.getTime() - start.getTime()) / msPerYear;
+    const ageAtRetirement = (end.getTime() - birth.getTime()) / msPerYear;
+    return {
+      serviceYears,
+      ageAtRetirement,
+      eligible: serviceYears >= 10,
+    };
+  }, [form.birthDate, form.startDate, form.endDate]);
+
+  const showEligibilityWarn =
+    step >= 1 &&
+    eligibilityCheck !== null &&
+    !eligibilityCheck.eligible &&
+    eligibilityAckedKey !== eligibilityKey;
+
+  const performReset = () => {
     if (typeof window === "undefined") return;
-    const confirmed = window.confirm(
-      "ต้องการเริ่มใหม่? ข้อมูลที่กรอกไว้ทั้งหมดจะถูกล้าง",
-    );
-    if (!confirmed) return;
     try {
       window.localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -244,7 +281,7 @@ export default function Home() {
           </div>
           <button
             type="button"
-            onClick={handleReset}
+            onClick={() => setResetOpen(true)}
             aria-label="เริ่มใหม่ — ล้างข้อมูลที่กรอกไว้"
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors min-h-[40px] cursor-pointer"
           >
@@ -255,14 +292,18 @@ export default function Home() {
       </header>
 
       {/* Progress Bar (own row, below navbar) */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      <div className="bg-white border-b border-gray-100 mt-2 sm:mt-3">
+        <div className="max-w-4xl mx-auto px-4 py-5 sm:py-6">
           <ProgressBar currentStep={step} />
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
+      {/* Main Content — widen for the salary calculation step so the desktop table has room */}
+      <div
+        className={`flex-1 mx-auto w-full px-4 py-8 ${
+          step === 4 ? "max-w-6xl" : "max-w-4xl"
+        }`}
+      >
         <AnimatePresence mode="wait">
           <motion.div
             key={step}
@@ -277,6 +318,50 @@ export default function Home() {
       </div>
 
       <Footer />
+
+      <ConfirmModal
+        open={resetOpen}
+        onConfirm={performReset}
+        onCancel={() => setResetOpen(false)}
+        title="ต้องการเริ่มใหม่?"
+        description="ข้อมูลที่กรอกไว้ทั้งหมดจะถูกล้าง และไม่สามารถกู้คืนได้"
+        confirmLabel="เริ่มใหม่"
+        cancelLabel="ยกเลิก"
+        variant="danger"
+      />
+
+      <ConfirmModal
+        open={showEligibilityWarn}
+        variant="info"
+        title="ข้อมูลไม่เข้าเงื่อนไขการรับบำเหน็จ/บำนาญ"
+        description={
+          <>
+            จากวันที่บรรจุและวันพ้นราชการที่กรอก คำนวณได้
+            <span className="font-semibold text-gray-900">
+              {" "}อายุราชการประมาณ {eligibilityCheck?.serviceYears.toFixed(1)} ปี
+            </span>{" "}
+            ซึ่งน้อยกว่า 10 ปี — ไม่เข้าเงื่อนไขการรับบำเหน็จหรือบำนาญข้าราชการ
+            <br />
+            <br />
+            หากท่านเป็นสมาชิก กบข. จะยังคงมีสิทธิรับ
+            <span className="font-semibold text-gray-900"> เงินสะสม กบข. </span>
+            ที่สะสมไว้ตลอดอายุราชการ
+            <br />
+            <br />
+            <span className="text-gray-500">
+              โปรดตรวจสอบวันบรรจุและวันพ้นราชการอีกครั้ง หากข้อมูลถูกต้อง
+              สามารถคลิก &quot;ดำเนินการต่อ&quot; เพื่อดูตัวเลขประมาณการได้
+            </span>
+          </>
+        }
+        confirmLabel="ดำเนินการต่อ"
+        cancelLabel="กลับไปแก้ไข"
+        onConfirm={() => setEligibilityAckedKey(eligibilityKey)}
+        onCancel={() => {
+          setEligibilityAckedKey(eligibilityKey);
+          setStep(1);
+        }}
+      />
     </main>
   );
 }

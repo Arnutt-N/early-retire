@@ -61,8 +61,10 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.waitForTimeout(400);
 
     // Step 3: Salary History (currentSalary)
+    // Input.tsx renders numeric fields as type="text" + inputMode="decimal"
+    // (avoids the <input type=number> step-snap bug). Select via inputmode.
     await page
-      .locator('input[type="number"]')
+      .locator('input[inputmode="decimal"]')
       .first()
       .fill('40000');
     await page.locator('button:has-text("ถัดไป")').click();
@@ -74,9 +76,17 @@ test.describe('Pension Calculator Smoke Tests', () => {
 
     // Step 5: Results — assert all 3 amounts shown
     await expect(page.getByRole('heading', { name: 'สรุปบำเหน็จบำนาญ' })).toBeVisible();
-    await expect(page.locator('text=เงินบำเหน็จ')).toBeVisible();
-    await expect(page.locator('text=เงินบำนาญรายเดือน')).toBeVisible();
-    await expect(page.locator('text=บำเหน็จดำรงชีพ')).toBeVisible();
+    // Use heading roles to disambiguate from the new comparison-card body text
+    // which also contains "เงินบำเหน็จ..." substrings.
+    await expect(
+      page.getByRole('heading', { name: /^เงินบำเหน็จ \(ก้อน\)$/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^เงินบำนาญรายเดือน$/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^บำเหน็จดำรงชีพ$/ }),
+    ).toBeVisible();
     // Disclaimer present
     await expect(page.locator('text=ประมาณการเบื้องต้น')).toBeVisible();
   });
@@ -116,8 +126,10 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.waitForTimeout(400);
 
     // Step 3
+    // Input.tsx renders numeric fields as type="text" + inputMode="decimal"
+    // (avoids the <input type=number> step-snap bug). Select via inputmode.
     await page
-      .locator('input[type="number"]')
+      .locator('input[inputmode="decimal"]')
       .first()
       .fill('40000');
     await page.locator('button:has-text("ถัดไป")').click();
@@ -129,9 +141,17 @@ test.describe('Pension Calculator Smoke Tests', () => {
 
     // Step 5 — gfp shows the same 3 amounts (computed differently)
     await expect(page.getByRole('heading', { name: 'สรุปบำเหน็จบำนาญ' })).toBeVisible();
-    await expect(page.locator('text=เงินบำเหน็จ')).toBeVisible();
-    await expect(page.locator('text=เงินบำนาญรายเดือน')).toBeVisible();
-    await expect(page.locator('text=บำเหน็จดำรงชีพ')).toBeVisible();
+    // Use heading roles to disambiguate from the new comparison-card body text
+    // which also contains "เงินบำเหน็จ..." substrings.
+    await expect(
+      page.getByRole('heading', { name: /^เงินบำเหน็จ \(ก้อน\)$/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^เงินบำนาญรายเดือน$/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^บำเหน็จดำรงชีพ$/ }),
+    ).toBeVisible();
   });
 
   test('mode selection gates progression', async ({ page }) => {

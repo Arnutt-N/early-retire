@@ -12,6 +12,8 @@ import { formatNumber } from "@/lib/utils";
 
 interface AnimatedNumberProps {
   value: number;
+  /** Decimal places to render. Default 0 (rounded to whole number). */
+  decimals?: number;
   /** Animation duration in seconds. Default 1.2s; ignored when prefers-reduced-motion. */
   duration?: number;
   className?: string;
@@ -23,14 +25,19 @@ interface AnimatedNumberProps {
  */
 export default function AnimatedNumber({
   value,
+  decimals = 0,
   duration = 1.2,
   className,
 }: AnimatedNumberProps) {
   const reduced = useReducedMotion();
   const motionValue = useMotionValue(reduced ? value : 0);
-  const display = useTransform(motionValue, (latest) =>
-    formatNumber(Math.round(latest)),
-  );
+  const display = useTransform(motionValue, (latest) => {
+    const rounded =
+      decimals > 0
+        ? Number(latest.toFixed(decimals))
+        : Math.round(latest);
+    return formatNumber(rounded, decimals);
+  });
 
   useEffect(() => {
     if (reduced) {
