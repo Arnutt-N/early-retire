@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import DatePickerTH from "@/components/DatePickerTH";
 import Button from "@/components/ui/Button";
 import { calculateRetirementDate } from "@/lib/calculations";
@@ -37,7 +38,21 @@ const retirementOptions = [
 ] as const;
 
 export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: Props) {
+  const [retirementWarning, setRetirementWarning] = useState<string>("");
+
   const handleRetirementOption = (option: FormState["retirementOption"]) => {
+    setRetirementWarning("");
+
+    // Validation: require prereq date for auto-calc options
+    if (option === "age60" && !form.birthDate) {
+      setRetirementWarning("กรุณาเลือกวันเดือนปีเกิดก่อน เพื่อคำนวณวันเกษียณอัตโนมัติ");
+      return;
+    }
+    if (option === "service25" && !form.startDate) {
+      setRetirementWarning("กรุณาเลือกวันบรรจุก่อน เพื่อคำนวณวันพ้นราชการอัตโนมัติ");
+      return;
+    }
+
     updateForm({ retirementOption: option });
 
     if (option === "age60" && form.birthDate) {
@@ -180,6 +195,22 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
             );
           })}
         </div>
+
+        {/* Validation warning toast (when prereq date missing) */}
+        <AnimatePresence>
+          {retirementWarning && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              role="alert"
+              className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm"
+            >
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5 text-amber-600" />
+              <p className="font-medium">{retirementWarning}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Date Picker */}
         <div className="pt-2">

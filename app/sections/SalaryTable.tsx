@@ -41,10 +41,11 @@ export default function SalaryTableSection({
     updateForm({ salaryOverrides: overrides });
   };
 
+  const totalMonths = records.length * 6;
   const subtitle =
     form.mode === "gfp"
-      ? `60 เดือนสุดท้าย (${records.length} รอบประเมิน)`
-      : `รอบประเมินล่าสุด → วันเกษียณ (${records.length} รอบประเมิน)`;
+      ? `60 เดือนสุดท้ายก่อนพ้นราชการ (${records.length} รอบ × 6 เดือน = ${totalMonths} เดือน)`
+      : `วันเลื่อนเงินเดือนล่าสุด → วันก่อนพ้นราชการ (${records.length} รอบ × 6 เดือน = ${totalMonths} เดือน)`;
 
   return (
     <motion.div

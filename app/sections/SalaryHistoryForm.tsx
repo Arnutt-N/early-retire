@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { motion } from "framer-motion";
+import { getBackwardRounds, formatThaiDate } from "@/lib/utils";
 import type { FormState } from "@/types";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -22,6 +23,15 @@ export default function SalaryHistoryForm({ form, updateForm, onNext, onBack }: 
     if (vals.length === 0) return 0;
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   }, [form.assessmentIncreases]);
+
+  // Compute backward round dates from latestAssessmentDate (most recent first).
+  // Used to label the 6 historical % inputs with their actual round date.
+  const roundDates = useMemo(() => {
+    if (!form.latestAssessmentDate) return null;
+    const anchor = new Date(form.latestAssessmentDate);
+    if (isNaN(anchor.getTime())) return null;
+    return getBackwardRounds(anchor, 6);
+  }, [form.latestAssessmentDate]);
 
   const updateAssessment = (index: number, value: string) => {
     const newVals = [...form.assessmentIncreases];
@@ -88,26 +98,31 @@ export default function SalaryHistoryForm({ form, updateForm, onNext, onBack }: 
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {form.assessmentIncreases.map((val, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <Input
-                label={`รอบที่ ${i + 1}`}
-                value={val}
-                onChange={(v) => updateAssessment(i, v)}
-                type="number"
-                step={0.1}
-                suffix="%"
-                className={cn(
-                  val > 0 && "!border-emerald-200 !bg-emerald-50/30"
-                )}
-              />
-            </motion.div>
-          ))}
+          {form.assessmentIncreases.map((val, i) => {
+            const roundLabel = roundDates
+              ? `รอบ ${formatThaiDate(roundDates[i].toISOString())}`
+              : `รอบที่ ${i + 1}`;
+            return (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <Input
+                  label={roundLabel}
+                  value={val}
+                  onChange={(v) => updateAssessment(i, v)}
+                  type="number"
+                  step={0.1}
+                  suffix="%"
+                  className={cn(
+                    val > 0 && "!border-emerald-200 !bg-emerald-50/30"
+                  )}
+                />
+              </motion.div>
+            );
+          })}
         </div>
 
         {/* Average Summary */}
