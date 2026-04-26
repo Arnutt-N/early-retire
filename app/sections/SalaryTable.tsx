@@ -61,7 +61,7 @@ export default function SalaryTableSection({
   const totalMonths = records.length * 6;
   const subtitle =
     form.mode === "gfp"
-      ? `60 เดือนสุดท้ายก่อนพ้นราชการ (${records.length} รอบ × 6 เดือน = ${totalMonths} เดือน)`
+      ? `${records.length} รอบ × 6 เดือน = ${totalMonths} เดือน — ขั้นต่ำ 60 เดือนสุดท้าย หรือถึงวันเลื่อนเงินเดือนล่าสุด แล้วแต่ระยะใดยาวกว่า`
       : `วันเลื่อนเงินเดือนล่าสุด → วันก่อนพ้นราชการ (${records.length} รอบ × 6 เดือน = ${totalMonths} เดือน)`;
 
   return (
@@ -262,16 +262,38 @@ export default function SalaryTableSection({
                                 const raw = e.target.value;
                                 const cleaned = raw
                                   .replace(/[^\d.]/g, "")
-                                  .replace(/(\..*)\./g, "$1");
+                                  .replace(/(\..*?)\..*/, "$1");
                                 const v = parseFloat(cleaned);
                                 updateOverride(i, {
                                   percent: isNaN(v) ? null : v,
                                 });
                               }}
-                              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-right text-xs font-medium focus:outline-none focus:border-violet-500"
+                              className={cn(
+                                "w-full px-2 py-1.5 rounded-lg border bg-white text-right text-xs font-medium focus:outline-none",
+                                Number(displayPercent) > 6
+                                  ? "border-red-300 focus:border-red-500"
+                                  : "border-gray-200 focus:border-violet-500",
+                              )}
+                              title={
+                                Number(displayPercent) > 6
+                                  ? "เกิน 6% — โปรดตรวจสอบ"
+                                  : undefined
+                              }
                             />
                           ) : (
-                            <span className="font-medium text-gray-800">
+                            <span
+                              className={cn(
+                                "font-medium",
+                                Number(displayPercent) > 6
+                                  ? "text-red-600"
+                                  : "text-gray-800",
+                              )}
+                              title={
+                                Number(displayPercent) > 6
+                                  ? "เกิน 6% — โปรดตรวจสอบ"
+                                  : undefined
+                              }
+                            >
                               {Number(displayPercent).toFixed(2)}%
                             </span>
                           )}
@@ -449,6 +471,7 @@ export default function SalaryTableSection({
                               <div>
                                 <label className="block text-[11px] font-medium text-gray-500 mb-1">
                                   % เลื่อน
+                                  <span className="ml-1 text-gray-400">(สูงสุด 6%)</span>
                                 </label>
                                 <input
                                   type="text"
@@ -460,14 +483,24 @@ export default function SalaryTableSection({
                                     const raw = e.target.value;
                                     const cleaned = raw
                                       .replace(/[^\d.]/g, "")
-                                      .replace(/(\..*)\./g, "$1");
+                                      .replace(/(\..*?)\..*/, "$1");
                                     const v = parseFloat(cleaned);
                                     updateOverride(i, {
                                       percent: isNaN(v) ? null : v,
                                     });
                                   }}
-                                  className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-right text-xs font-medium focus:outline-none focus:border-violet-500"
+                                  className={cn(
+                                    "w-full px-3 py-2 rounded-lg border bg-white text-right text-xs font-medium focus:outline-none",
+                                    Number(displayPercent) > 6
+                                      ? "border-red-300 focus:border-red-500"
+                                      : "border-gray-200 focus:border-violet-500",
+                                  )}
                                 />
+                                {Number(displayPercent) > 6 && (
+                                  <p className="mt-1 text-[10px] text-red-500">
+                                    เกิน 6% — โปรดตรวจสอบ
+                                  </p>
+                                )}
                               </div>
                             </div>
                           ) : (

@@ -61,8 +61,10 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.waitForTimeout(400);
 
     // Step 3: Salary History (currentSalary)
+    // Input.tsx renders numeric fields as type="text" + inputMode="decimal"
+    // (avoids the <input type=number> step-snap bug). Select via inputmode.
     await page
-      .locator('input[type="number"]')
+      .locator('input[inputmode="decimal"]')
       .first()
       .fill('40000');
     await page.locator('button:has-text("ถัดไป")').click();
@@ -116,8 +118,10 @@ test.describe('Pension Calculator Smoke Tests', () => {
     await page.waitForTimeout(400);
 
     // Step 3
+    // Input.tsx renders numeric fields as type="text" + inputMode="decimal"
+    // (avoids the <input type=number> step-snap bug). Select via inputmode.
     await page
-      .locator('input[type="number"]')
+      .locator('input[inputmode="decimal"]')
       .first()
       .fill('40000');
     await page.locator('button:has-text("ถัดไป")').click();

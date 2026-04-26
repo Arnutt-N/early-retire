@@ -19,9 +19,12 @@ export function roundUp10(value: number): number {
   return Math.ceil(value / 10) * 10;
 }
 
-export function formatNumber(num: number): string {
-  if (isNaN(num)) return "0";
-  return num.toLocaleString("th-TH");
+export function formatNumber(num: number, decimals: number = 0): string {
+  if (isNaN(num)) return decimals > 0 ? `0.${"0".repeat(decimals)}` : "0";
+  return num.toLocaleString("th-TH", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
 }
 
 export function formatThaiDate(date: Date | string | null): string {

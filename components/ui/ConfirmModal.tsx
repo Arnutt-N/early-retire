@@ -50,6 +50,15 @@ const variantConfig: Record<
   },
 };
 
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  'input:not([disabled]):not([type="hidden"])',
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
 export default function ConfirmModal({
   open,
   onConfirm,
@@ -67,10 +76,19 @@ export default function ConfirmModal({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
-  // Focus management + body scroll lock + Escape handler.
+  // Stable callback ref so the effect doesn't re-run on every parent render.
+  // Inline lambdas like `onCancel={() => setOpen(false)}` change identity each
+  // render — without this, the effect would re-attach handlers and re-lock
+  // scroll on every render while the modal is open.
+  const onCancelRef = useRef(onCancel);
+  useEffect(() => {
+    onCancelRef.current = onCancel;
+  }, [onCancel]);
+
+  // Focus management + body scroll lock + Escape + Tab focus trap.
   // For a destructive confirm we focus the dialog container itself, NOT the
-  // confirm button — this prevents an accidental Enter press from triggering
-  // the destructive action. Users must deliberately Tab to the action.
+  // confirm button — this prevents an accidental Enter from triggering the
+  // destructive action. Users must deliberately Tab to the action.
   useEffect(() => {
     if (!open) return;
 
@@ -86,7 +104,29 @@ export default function ConfirmModal({
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onCancel();
+        onCancelRef.current();
+        return;
+      }
+      // Tab focus trap — keep focus inside the dialog.
+      if (e.key === "Tab" && dialogRef.current) {
+        const focusables = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+        ).filter((el) => el.offsetParent !== null);
+        if (focusables.length === 0) {
+          e.preventDefault();
+          dialogRef.current.focus();
+          return;
+        }
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (e.shiftKey && (active === first || active === dialogRef.current)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
     document.addEventListener("keydown", handleKey);
@@ -97,7 +137,7 @@ export default function ConfirmModal({
       document.body.style.overflow = originalOverflow;
       previousFocusRef.current?.focus?.();
     };
-  }, [open, onCancel]);
+  }, [open]);
 
   const { Icon, iconClass, iconBg, confirmVariant } = variantConfig[variant];
 

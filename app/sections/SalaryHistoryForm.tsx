@@ -92,9 +92,12 @@ export default function SalaryHistoryForm({ form, updateForm, onNext, onBack }: 
 
       {/* Assessment History */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-[var(--shadow-e2)] p-6 space-y-5">
-        <div className="flex items-center gap-2">
-          <TrendingUp size={20} className="text-gray-500" />
-          <h3 className="font-semibold text-gray-900">% การเลื่อนเงินเดือนย้อนหลัง (6 รอบ)</h3>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <TrendingUp size={20} className="text-gray-500" />
+            <h3 className="font-semibold text-gray-900">% การเลื่อนเงินเดือนย้อนหลัง (6 รอบ)</h3>
+          </div>
+          <span className="text-xs text-gray-500 font-medium">สูงสุดรอบละ 6%</span>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -102,6 +105,7 @@ export default function SalaryHistoryForm({ form, updateForm, onNext, onBack }: 
             const roundLabel = roundDates
               ? `รอบ ${formatThaiDate(roundDates[i].toISOString())}`
               : `รอบที่ ${i + 1}`;
+            const overLimit = val > 6;
             return (
               <motion.div
                 key={i}
@@ -116,8 +120,9 @@ export default function SalaryHistoryForm({ form, updateForm, onNext, onBack }: 
                   type="number"
                   step={0.1}
                   suffix="%"
+                  error={overLimit ? "เกิน 6% — โปรดตรวจสอบ" : undefined}
                   className={cn(
-                    val > 0 && "!border-emerald-200 !bg-emerald-50/30"
+                    !overLimit && val > 0 && "!border-emerald-200 !bg-emerald-50/30",
                   )}
                 />
               </motion.div>

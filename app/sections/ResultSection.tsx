@@ -130,6 +130,7 @@ export default function ResultSection({
               <div className="text-center py-4">
                 <AnimatedNumber
                   value={result.lumpSum}
+                  decimals={2}
                   className="text-4xl md:text-5xl font-bold block thai-num"
                 />
                 <p className="text-blue-100 mt-2">บาท</p>
@@ -153,6 +154,7 @@ export default function ResultSection({
               <div className="text-center py-4">
                 <AnimatedNumber
                   value={result.monthly}
+                  decimals={2}
                   className="text-4xl md:text-5xl font-bold block thai-num"
                 />
                 <p className="text-emerald-100 mt-2">บาท / เดือน</p>
@@ -176,17 +178,17 @@ export default function ResultSection({
                   <h3 className="font-semibold text-gray-900">บำเหน็จดำรงชีพ</h3>
                 </div>
                 <p className="text-sm text-gray-600 mb-4">
-                  รวม <span className="font-bold text-gray-900">{formatNumber(livelihood.total)}</span> บาท 
+                  รวม <span className="font-bold text-gray-900">{formatNumber(livelihood.total, 2)}</span> บาท
                   (บำนาญรายเดือน × 15) แบ่งจ่าย 3 ครั้ง:
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {livelihood.rounds.map((r) => (
-                    <div 
-                      key={r.round} 
+                    <div
+                      key={r.round}
                       className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-4 text-center"
                     >
                       <p className="text-xs font-medium text-amber-600 mb-2">{r.label}</p>
-                      <p className="text-2xl font-bold text-amber-700">{formatNumber(r.amount)}</p>
+                      <p className="text-2xl font-bold text-amber-700">{formatNumber(r.amount, 2)}</p>
                       <p className="text-xs text-amber-500 mt-1">บาท</p>
                     </div>
                   ))}

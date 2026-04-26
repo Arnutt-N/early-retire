@@ -1,7 +1,7 @@
 "use client";
 
+import { useState, type FocusEvent, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import type { ReactNode, FocusEvent } from "react";
 
 interface InputProps {
   label?: string;
@@ -48,30 +48,39 @@ export default function Input({
   const inputMode = isNumeric ? "decimal" : undefined;
   const pattern = isNumeric ? "[0-9]*[.]?[0-9]*" : undefined;
 
-  // Select-all on focus for numeric fields so typing replaces the leading 0
-  // (fixes UX issue: "0" + typed "5" → "05" briefly).
+  // Local "draft" string for numeric fields. While the user is mid-typing, we
+  // display the raw text they entered (preserving trailing decimal points like
+  // "3.") instead of the parsed-and-restringified controlled value (which would
+  // strip the dot since parseFloat("3.") === 3 → "3"). On blur the draft is
+  // cleared so the input snaps back to the canonical controlled value.
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const stringValue =
+    isNumeric && (value === 0 || value === "0") ? "" : String(value);
+  const displayValue = isNumeric && draft !== null ? draft : stringValue;
+
   const handleFocus = isNumeric
     ? (e: FocusEvent<HTMLInputElement>) => e.target.select()
     : undefined;
 
-  // Hide a literal "0" so the placeholder shows instead.
-  const displayValue =
-    isNumeric && (value === 0 || value === "0") ? "" : value;
+  const handleBlur = isNumeric
+    ? () => setDraft(null)
+    : undefined;
 
   // Filter non-numeric keystrokes so users can't type letters, while still
-  // allowing digits, a single decimal point, and an empty string (for clearing).
+  // allowing digits, a single decimal point, and an empty string.
   const handleChange = isNumeric
     ? (raw: string) => {
-        if (raw === "") return onChange("");
-        // Allow digits + at most one decimal point.
-        const cleaned = raw.replace(/[^\d.]/g, "");
-        const firstDot = cleaned.indexOf(".");
-        const normalized =
-          firstDot === -1
-            ? cleaned
-            : cleaned.slice(0, firstDot + 1) +
-              cleaned.slice(firstDot + 1).replace(/\./g, "");
-        onChange(normalized);
+        if (raw === "") {
+          setDraft("");
+          onChange("");
+          return;
+        }
+        const cleaned = raw
+          .replace(/[^\d.]/g, "")
+          .replace(/(\..*?)\..*/, "$1");
+        setDraft(cleaned);
+        onChange(cleaned);
       }
     : onChange;
 
@@ -96,6 +105,7 @@ export default function Input({
           value={displayValue}
           onChange={(e) => handleChange(e.target.value)}
           onFocus={handleFocus}
+          onBlur={handleBlur}
           placeholder={placeholder ?? (isNumeric ? "0" : undefined)}
           disabled={disabled}
           min={isNumeric ? undefined : min}

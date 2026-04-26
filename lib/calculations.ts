@@ -219,20 +219,38 @@ export function generateSalaryTable(
   lastDay.setDate(lastDay.getDate() - 1);
   const anchorRound = getMostRecentRound(lastDay);
 
+  // Snap latestAssessmentDate UP to the next round boundary on/after it.
+  // Used by both GFP and non-GFP branches.
+  let snappedAssessment = getMostRecentRound(assessmentDate);
+  if (snappedAssessment.getTime() < assessmentDate.getTime()) {
+    snappedAssessment = new Date(snappedAssessment);
+    snappedAssessment.setMonth(snappedAssessment.getMonth() + 6);
+  }
+
   // Determine the FIRST round date in the table (oldest):
-  // - GPF: 60 months = 10 rounds total → first = anchor − 54 months
-  // - non-GPF: from assessmentDate (snapped UP to next round on/after) → anchor
+  // - GFP: window = [ MIN(60-months-back-from-anchor, snappedAssessment), anchor ]
+  //        → if assessmentDate is OLDER than the 60-month cutoff, extend window
+  //          back to assessmentDate so the user can edit older historical %.
+  //        → if assessmentDate is RECENT (newer than 60-month cutoff), bound
+  //          window to exactly the last 60 months.
+  // - non-GFP: window = [ snappedAssessment, anchor ]
   let firstRound: Date;
   if (mode === "gfp") {
-    firstRound = new Date(anchorRound);
-    firstRound.setMonth(firstRound.getMonth() - 54);
+    const sixtyMonthsBack = new Date(anchorRound);
+    sixtyMonthsBack.setMonth(sixtyMonthsBack.getMonth() - 54); // 10 rounds = 60 months
+    const startMs = Math.min(
+      sixtyMonthsBack.getTime(),
+      snappedAssessment.getTime(),
+    );
+    firstRound = new Date(startMs);
+    // Safety: if the assessment date itself is past the anchor (shouldn't happen
+    // in practice but guard anyway), collapse to a single row at anchor.
+    if (firstRound.getTime() > anchorRound.getTime()) {
+      firstRound = new Date(anchorRound);
+    }
   } else {
     // non-GPF: latest assessment date → anchorRound
-    let snapped = getMostRecentRound(assessmentDate);
-    if (snapped.getTime() < assessmentDate.getTime()) {
-      snapped = new Date(snapped);
-      snapped.setMonth(snapped.getMonth() + 6);
-    }
+    let snapped = snappedAssessment;
     if (snapped.getTime() > anchorRound.getTime()) {
       // assessment date is past the last round — single row at anchor
       snapped = new Date(anchorRound);
