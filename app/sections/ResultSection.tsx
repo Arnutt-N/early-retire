@@ -251,7 +251,7 @@ export default function ResultSection({
                           </span>
                         </li>
                         <li>
-                          • เกษียณอายุราชการ (60 ปี) + อายุราชการ ≥ 10 ปี{" "}
+                          • เกษียณอายุราชการ (60 ปี){" "}
                           <span className="text-red-500">
                             (อายุตัว {eligibility.ageAtRetirement.toFixed(1)} ปี — ยังไม่ถึง 60)
                           </span>

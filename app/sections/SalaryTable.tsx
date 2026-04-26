@@ -76,19 +76,15 @@ export default function SalaryTableSection({
     0,
   );
   const totalMonthsInWindow = Math.round(rawTotalMonths);
-  // Calendar-precise window boundaries (NOT the row.period, which snaps to
-  // fiscal-round starts). The summary card needs to show:
-  //   เริ่มนับ = exit − 60 calendar months (e.g. resign 1/6/2570 → 1/6/2565)
-  //   วันก่อนพ้น = exit − 1 day (e.g. exit 1/10/2585 → 30/9/2585)
+  // Window start uses the FIRST counting row's period (fiscal-aligned) so the
+  // heading matches the first row visible in the table — avoids the "off by 1
+  // day" confusion when exit isn't on a fiscal boundary (e.g. exit 2/10 →
+  // calendar windowStart = 2/10 of 5y prior, but the actual first row is at
+  // 1/10 of that year because that's the fiscal round containing 2/10).
+  // Window end uses calendar-precise (exit − 1 day) since that IS the last
+  // working day and matters for the non-GFP formula.
   const exitDate = form.endDate ? new Date(form.endDate) : null;
-  const windowStartCalendar =
-    exitDate && !isNaN(exitDate.getTime())
-      ? (() => {
-          const d = new Date(exitDate);
-          d.setMonth(d.getMonth() - 60);
-          return d.toISOString();
-        })()
-      : null;
+  const windowStartFiscal = rowsInWindow[0]?.period ?? null;
   const windowEndCalendar =
     exitDate && !isNaN(exitDate.getTime())
       ? (() => {
@@ -267,7 +263,7 @@ export default function SalaryTableSection({
               </p>
             </div>
           </div>
-          {windowStartCalendar && windowEndCalendar && (
+          {windowStartFiscal && windowEndCalendar && (
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
               <div
                 className={cn(
@@ -289,7 +285,7 @@ export default function SalaryTableSection({
                     windowComplete ? "text-emerald-900" : "text-amber-900",
                   )}
                 >
-                  {formatThaiDate(windowStartCalendar)}
+                  {formatThaiDate(windowStartFiscal)}
                 </p>
               </div>
               <div
