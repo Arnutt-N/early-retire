@@ -193,6 +193,26 @@ export interface SalaryRecord {
   newSalary: number;
   isEstimated: boolean;
   isCurrent: boolean;
+  /**
+   * Months this row contributes to the 60-month averaging window for GFP.
+   * 6 = full fiscal round inside window. 1-5 = partial boundary row (e.g.
+   * resignation on a non-fiscal date). 0 = row is outside window (still shown
+   * for historical edit context, but not counted in the average).
+   */
+  monthsInWindow: number;
+}
+
+/**
+ * Inclusive month count between two dates, rounded to nearest whole month.
+ * Uses average month length (30.4375 days) — accurate for our day-aligned
+ * fiscal-round boundaries (1 Apr / 1 Oct → 6 months) and partial spans
+ * caused by non-fiscal exit dates (e.g. 1/6 - 30/9 → 4 months).
+ */
+function monthsInRange(start: Date, end: Date): number {
+  if (end.getTime() < start.getTime()) return 0;
+  const dayMs = 1000 * 60 * 60 * 24;
+  const days = Math.floor((end.getTime() - start.getTime()) / dayMs) + 1;
+  return Math.round(days / 30.4375);
 }
 
 export function generateSalaryTable(
@@ -228,18 +248,23 @@ export function generateSalaryTable(
   }
 
   // Determine the FIRST round date in the table (oldest):
-  // - GFP: window = [ MIN(60-months-back-from-anchor, snappedAssessment), anchor ]
-  //        → if assessmentDate is OLDER than the 60-month cutoff, extend window
-  //          back to assessmentDate so the user can edit older historical %.
-  //        → if assessmentDate is RECENT (newer than 60-month cutoff), bound
-  //          window to exactly the last 60 months.
+  // - GFP: window = [ MIN(getMostRecentRound(endDate − 60 mo), snappedAssessment), anchor ]
+  //        → calendar-precise 60-month cutoff: take endDate − 60 months
+  //          (e.g. exit 1/6/2570 → cutoff 1/6/2565), then snap DOWN to the
+  //          fiscal boundary at-or-before that date (e.g. 1/4/2565). This
+  //          captures partial first-round months when exit isn't on 1 Oct/1 Apr.
+  //        → if assessmentDate is OLDER than the cutoff, extend window back
+  //          to assessmentDate so the user can edit older historical %.
+  //        → if assessmentDate is RECENT (newer than cutoff), bound window to
+  //          the fiscal round containing the cutoff.
   // - non-GFP: window = [ snappedAssessment, anchor ]
   let firstRound: Date;
   if (mode === "gfp") {
-    const sixtyMonthsBack = new Date(anchorRound);
-    sixtyMonthsBack.setMonth(sixtyMonthsBack.getMonth() - 54); // 10 rounds = 60 months
+    const sixtyMonthsBackCalendar = new Date(endDate);
+    sixtyMonthsBackCalendar.setMonth(sixtyMonthsBackCalendar.getMonth() - 60);
+    const sixtyMonthsBackFiscal = getMostRecentRound(sixtyMonthsBackCalendar);
     const startMs = Math.min(
-      sixtyMonthsBack.getTime(),
+      sixtyMonthsBackFiscal.getTime(),
       snappedAssessment.getTime(),
     );
     firstRound = new Date(startMs);
@@ -304,6 +329,7 @@ export function generateSalaryTable(
       newSalary: cappedNewSalary,
       isEstimated,
       isCurrent,
+      monthsInWindow: 0, // computed in post-pass below
     });
 
     salary = cappedNewSalary;
@@ -312,5 +338,36 @@ export function generateSalaryTable(
     periodCount++;
   }
 
-  return records;
+  // Post-pass: compute monthsInWindow per row based on overlap with the
+  // 60-month averaging window [endDate − 60 mo, endDate − 1 day].
+  // Each row's "fiscal period" = [period, nextRow.period − 1 day] (or
+  // [period, endDate − 1 day] for the last row).
+  const windowEnd = new Date(endDate);
+  windowEnd.setDate(windowEnd.getDate() - 1);
+  const windowStart = new Date(endDate);
+  windowStart.setMonth(windowStart.getMonth() - 60);
+
+  return records.map((r, idx) => {
+    const rowStart = new Date(r.period);
+    let rowEnd: Date;
+    if (idx < records.length - 1) {
+      rowEnd = new Date(records[idx + 1].period);
+      rowEnd.setDate(rowEnd.getDate() - 1);
+    } else {
+      // Last row: extends to the day before exit
+      rowEnd = new Date(windowEnd);
+    }
+
+    const overlapStart =
+      rowStart.getTime() > windowStart.getTime() ? rowStart : windowStart;
+    const overlapEnd =
+      rowEnd.getTime() < windowEnd.getTime() ? rowEnd : windowEnd;
+
+    const monthsInWindow =
+      overlapStart.getTime() <= overlapEnd.getTime()
+        ? monthsInRange(overlapStart, overlapEnd)
+        : 0;
+
+    return { ...r, monthsInWindow };
+  });
 }

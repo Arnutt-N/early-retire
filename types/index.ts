@@ -54,6 +54,12 @@ export interface SalaryRecord {
   newSalary: number;
   isEstimated: boolean;
   isCurrent: boolean;
+  /**
+   * Months this row contributes to the 60-month averaging window for GFP.
+   * 6 = full fiscal round inside window. 1-5 = partial boundary row. 0 = outside.
+   * Mirrors lib/calculations.ts SalaryRecord — keep in sync.
+   */
+  monthsInWindow: number;
 }
 
 export interface FormState {
