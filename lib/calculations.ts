@@ -1,4 +1,4 @@
-import { roundUp10, toBE } from "./utils";
+import { roundUp10, toBE, getMostRecentRound } from "./utils";
 
 export interface ServicePeriod {
   years: number;
@@ -214,21 +214,38 @@ export function generateSalaryTable(
       ? increases.reduce((a, b) => a + b, 0) / increases.length
       : 3.5;
 
-  let salary = currentSalary;
-  let currentDate = new Date(assessmentDate);
-  const isGfp = mode === "gfp";
-  const targetDate = new Date(endDate);
+  // Anchor: day BEFORE retirement (per improve-flow-logic.txt #8)
+  const lastDay = new Date(endDate);
+  lastDay.setDate(lastDay.getDate() - 1);
+  const anchorRound = getMostRecentRound(lastDay);
 
-  if (isGfp) {
-    const monthsBack = 60;
-    currentDate = new Date(targetDate);
-    currentDate.setMonth(currentDate.getMonth() - monthsBack);
+  // Determine the FIRST round date in the table (oldest):
+  // - GPF: 60 months = 10 rounds total → first = anchor − 54 months
+  // - non-GPF: from assessmentDate (snapped UP to next round on/after) → anchor
+  let firstRound: Date;
+  if (mode === "gfp") {
+    firstRound = new Date(anchorRound);
+    firstRound.setMonth(firstRound.getMonth() - 54);
+  } else {
+    // non-GPF: latest assessment date → anchorRound
+    let snapped = getMostRecentRound(assessmentDate);
+    if (snapped.getTime() < assessmentDate.getTime()) {
+      snapped = new Date(snapped);
+      snapped.setMonth(snapped.getMonth() + 6);
+    }
+    if (snapped.getTime() > anchorRound.getTime()) {
+      // assessment date is past the last round — single row at anchor
+      snapped = new Date(anchorRound);
+    }
+    firstRound = snapped;
   }
 
+  let salary = currentSalary;
+  let cursor = new Date(firstRound);
   let periodCount = 0;
-  const maxPeriods = isGfp ? 60 : 100;
+  const safety = 200; // hard cap to prevent runaway loops
 
-  while (currentDate <= targetDate && periodCount < maxPeriods) {
+  while (cursor.getTime() <= anchorRound.getTime() && periodCount < safety) {
     const override = overrides[periodCount];
 
     // Per-row level override falls back to default
@@ -238,13 +255,8 @@ export function generateSalaryTable(
         ? defaultBaseInfo
         : (getSalaryBaseForLevel(rowLevel, salaryBases) ?? defaultBaseInfo);
 
-    // Per-row effective date override falls back to walking computation
-    if (override?.effectiveDate) {
-      currentDate = new Date(override.effectiveDate);
-    }
-
-    const nextDate = new Date(currentDate);
-    nextDate.setMonth(nextDate.getMonth() + 6);
+    // Per-row effective-date override jumps the cursor for this row only
+    const rowDate = override?.effectiveDate ? new Date(override.effectiveDate) : cursor;
 
     const computedPercent =
       periodCount < increases.length ? increases[periodCount] : avgPercent;
@@ -253,15 +265,17 @@ export function generateSalaryTable(
     const rawIncrease = useBase * (percent / 100);
     const actualIncrease = roundUp10(rawIncrease);
     const newSalary = salary + actualIncrease;
+    const cappedNewSalary =
+      newSalary > rowBaseInfo.fullSalary ? rowBaseInfo.fullSalary : newSalary;
 
     const isCurrent = periodCount === 0;
     const isEstimated = periodCount >= increases.length;
 
     records.push({
-      period: currentDate.toISOString(),
-      periodLabel: `${currentDate.getDate().toString().padStart(2, "0")}/${(
-        currentDate.getMonth() + 1
-      ).toString().padStart(2, "0")}/${toBE(currentDate.getFullYear())}`,
+      period: rowDate.toISOString(),
+      periodLabel: `${rowDate.getDate().toString().padStart(2, "0")}/${(
+        rowDate.getMonth() + 1
+      ).toString().padStart(2, "0")}/${toBE(rowDate.getFullYear())}`,
       level: rowLevel,
       oldSalary: salary,
       maxSalary: rowBaseInfo.fullSalary,
@@ -269,16 +283,15 @@ export function generateSalaryTable(
       percent,
       increase: Math.round(rawIncrease * 100) / 100,
       actualIncrease,
-      newSalary: newSalary > rowBaseInfo.fullSalary ? rowBaseInfo.fullSalary : newSalary,
+      newSalary: cappedNewSalary,
       isEstimated,
       isCurrent,
     });
 
-    salary = newSalary > rowBaseInfo.fullSalary ? rowBaseInfo.fullSalary : newSalary;
-    currentDate = nextDate;
+    salary = cappedNewSalary;
+    cursor = new Date(cursor);
+    cursor.setMonth(cursor.getMonth() + 6);
     periodCount++;
-
-    if (isGfp && records.length >= 10) break; // ~60 months = ~10 periods
   }
 
   return records;
