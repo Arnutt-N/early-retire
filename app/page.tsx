@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import ProgressBar from "@/components/ProgressBar";
 import Footer from "@/components/Footer";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import ModeSelect from "./sections/ModeSelect";
 import PersonalInfoForm from "./sections/PersonalInfoForm";
 import ServicePeriodForm from "./sections/ServicePeriodForm";
@@ -81,6 +82,7 @@ function loadInitialForm(): FormState {
 export default function Home() {
   const [form, setForm] = useState<FormState>(loadInitialForm);
   const [step, setStep] = useState(0);
+  const [resetOpen, setResetOpen] = useState(false);
 
   const updateForm = (updates: Partial<FormState>) => {
     setForm((prev) => {
@@ -170,12 +172,8 @@ export default function Home() {
   const goNext = () => setStep((s) => Math.min(s + 1, 5));
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
-  const handleReset = () => {
+  const performReset = () => {
     if (typeof window === "undefined") return;
-    const confirmed = window.confirm(
-      "ต้องการเริ่มใหม่? ข้อมูลที่กรอกไว้ทั้งหมดจะถูกล้าง",
-    );
-    if (!confirmed) return;
     try {
       window.localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -244,7 +242,7 @@ export default function Home() {
           </div>
           <button
             type="button"
-            onClick={handleReset}
+            onClick={() => setResetOpen(true)}
             aria-label="เริ่มใหม่ — ล้างข้อมูลที่กรอกไว้"
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors min-h-[40px] cursor-pointer"
           >
@@ -255,14 +253,18 @@ export default function Home() {
       </header>
 
       {/* Progress Bar (own row, below navbar) */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      <div className="bg-white border-b border-gray-100 mt-2 sm:mt-3">
+        <div className="max-w-4xl mx-auto px-4 py-5 sm:py-6">
           <ProgressBar currentStep={step} />
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
+      {/* Main Content — widen for the salary calculation step so the desktop table has room */}
+      <div
+        className={`flex-1 mx-auto w-full px-4 py-8 ${
+          step === 4 ? "max-w-6xl" : "max-w-4xl"
+        }`}
+      >
         <AnimatePresence mode="wait">
           <motion.div
             key={step}
@@ -277,6 +279,17 @@ export default function Home() {
       </div>
 
       <Footer />
+
+      <ConfirmModal
+        open={resetOpen}
+        onConfirm={performReset}
+        onCancel={() => setResetOpen(false)}
+        title="ต้องการเริ่มใหม่?"
+        description="ข้อมูลที่กรอกไว้ทั้งหมดจะถูกล้าง และไม่สามารถกู้คืนได้"
+        confirmLabel="เริ่มใหม่"
+        cancelLabel="ยกเลิก"
+        variant="danger"
+      />
     </main>
   );
 }

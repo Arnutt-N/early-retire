@@ -71,14 +71,14 @@ export function selectBaseForSalary(
 export function calculateRetirementDate(birthDate: Date): Date {
   let retireYear = birthDate.getFullYear() + 60;
   const birthMonth = birthDate.getMonth();
-  const birthDay = birthDate.getDate();
 
-  // If born on or after Oct 1, add 1 year
+  // If born on or after Oct 1 (Thai fiscal-year cutoff), retire one year later.
+  // Retirement always lands on 1 October of the qualifying fiscal year.
   if (birthMonth >= 9) {
     retireYear += 1;
   }
 
-  return new Date(retireYear, birthMonth, birthDay);
+  return new Date(retireYear, 9, 1); // month index 9 = October
 }
 
 export function calculateServicePeriod(

@@ -13,7 +13,7 @@ interface Props {
   onNext: () => void;
 }
 
-const MODES = ["non-gfp", "gfp"] as const;
+const MODES = ["gfp", "non-gfp"] as const;
 type ModeValue = (typeof MODES)[number];
 
 const modeConfig: Record<ModeValue, {

@@ -12,7 +12,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import SocialShare from "@/components/SocialShare";
-import { Award, Calendar, TrendingUp, User, Printer, Info, Wallet, Gift, ChevronLeft, Sparkles } from "lucide-react";
+import { Award, Calendar, TrendingUp, User, Printer, Info, Wallet, Gift, ChevronLeft, Sparkles, Check, X, Scale } from "lucide-react";
 
 interface Props {
   mode: "gfp" | "non-gfp" | null;
@@ -239,6 +239,132 @@ export default function ResultSection({
           </div>
         </Card>
       )}
+
+      {/* Compare: Lump-Sum vs Monthly Pension — eligibility & benefits */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+      >
+        <Card hover={false} elevation="e2">
+          <div className="flex items-center gap-2 mb-4">
+            <Scale size={20} className="text-violet-500" />
+            <div>
+              <h3 className="font-semibold text-gray-900">เลือกรับเงินแบบไหนดี?</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                เปรียบเทียบสิทธิประโยชน์ บำเหน็จ (เงินก้อน) vs บำนาญ (รายเดือน)
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Lump-sum column */}
+            <div className="rounded-xl border-2 border-blue-100 bg-blue-50/30 p-4">
+              <div className="flex items-center gap-2 mb-3 pb-3 border-b border-blue-100">
+                <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Wallet size={18} className="text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-blue-900">กรณีเลือกรับบำเหน็จ</p>
+                  <p className="text-xs text-blue-600">เงินก้อนครั้งเดียว</p>
+                </div>
+              </div>
+              <ul className="space-y-2.5 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <Check size={12} className="text-emerald-600" strokeWidth={3} />
+                  </span>
+                  <span className="text-gray-700 leading-snug">
+                    ได้รับเงินก้อนครั้งเดียว พร้อมเงินจาก กบข. สำหรับผู้เป็นสมาชิก
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <X size={12} className="text-red-600" strokeWidth={3} />
+                  </span>
+                  <span className="text-gray-600 leading-snug">
+                    ไม่มีสิทธิเบิกค่ารักษาพยาบาลของตนเอง คู่สมรส บุตร และบิดามารดา
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <X size={12} className="text-red-600" strokeWidth={3} />
+                  </span>
+                  <span className="text-gray-600 leading-snug">
+                    ไม่มีสิทธิได้รับเงินบำเหน็จดำรงชีพ
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <X size={12} className="text-red-600" strokeWidth={3} />
+                  </span>
+                  <span className="text-gray-600 leading-snug">
+                    ไม่มีสิทธิได้รับเงินบำเหน็จตกทอด (30 เท่าของบำนาญ)
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Monthly pension column */}
+            <div className="rounded-xl border-2 border-emerald-100 bg-emerald-50/30 p-4">
+              <div className="flex items-center gap-2 mb-3 pb-3 border-b border-emerald-100">
+                <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <TrendingUp size={18} className="text-emerald-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-emerald-900">กรณีเลือกรับบำนาญ</p>
+                  <p className="text-xs text-emerald-600">รายเดือนตลอดชีวิต</p>
+                </div>
+              </div>
+              <ul className="space-y-2.5 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <Check size={12} className="text-emerald-600" strokeWidth={3} />
+                  </span>
+                  <span className="text-gray-700 leading-snug">
+                    ได้รับบำนาญเป็นรายเดือน พร้อมเงินจาก กบข. สำหรับผู้เป็นสมาชิก
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <Check size={12} className="text-emerald-600" strokeWidth={3} />
+                  </span>
+                  <span className="text-gray-700 leading-snug">
+                    มีสิทธิเบิกค่ารักษาพยาบาลของตนเอง คู่สมรส บุตร และบิดามารดา
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <Check size={12} className="text-emerald-600" strokeWidth={3} />
+                  </span>
+                  <span className="text-gray-700 leading-snug">
+                    มีสิทธิได้รับเงินบำเหน็จดำรงชีพ
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <Check size={12} className="text-emerald-600" strokeWidth={3} />
+                  </span>
+                  <span className="text-gray-700 leading-snug">
+                    มีสิทธิได้รับเงินบำเหน็จตกทอด (30 เท่าของบำนาญ)
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Footnote about inheritance deduction rule */}
+          <div className="mt-4 pt-4 border-t border-gray-100 flex items-start gap-2 text-xs text-gray-500 italic leading-relaxed">
+            <Info size={14} className="mt-0.5 flex-shrink-0 text-gray-400" />
+            <p>
+              <span className="font-medium text-gray-600 not-italic">หมายเหตุ:</span>{" "}
+              การคำนวณเงินบำเหน็จตกทอดที่ทายาทมีสิทธิได้รับ
+              หากผู้รับบำนาญได้รับเงินบำเหน็จดำรงชีพไปแล้ว
+              ให้นำเงินบำเหน็จดำรงชีพที่ได้รับไปแล้วมาหักออกก่อน
+            </p>
+          </div>
+        </Card>
+      </motion.div>
 
       {/* Disclaimer */}
       <motion.div

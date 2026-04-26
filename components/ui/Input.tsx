@@ -38,16 +38,42 @@ export default function Input({
   step,
   className,
 }: InputProps) {
-  // For number inputs, select all text on focus so typing replaces the leading 0
-  // (fixes UX issue: "0" + typed "5" → "05" briefly)
-  const handleFocus =
-    type === "number"
-      ? (e: FocusEvent<HTMLInputElement>) => e.target.select()
-      : undefined;
+  const isNumeric = type === "number";
 
-  // For number inputs, hide a literal "0" so the placeholder shows instead
+  // Render numeric inputs as type="text" with inputMode="decimal" to avoid
+  // <input type="number"> browser quirks: step-snapping on blur (30000 → 29998),
+  // scroll-wheel mutating values, and up/down arrow keys silently incrementing.
+  // Mobile users still get the numeric keyboard via inputMode.
+  const renderType = isNumeric ? "text" : type;
+  const inputMode = isNumeric ? "decimal" : undefined;
+  const pattern = isNumeric ? "[0-9]*[.]?[0-9]*" : undefined;
+
+  // Select-all on focus for numeric fields so typing replaces the leading 0
+  // (fixes UX issue: "0" + typed "5" → "05" briefly).
+  const handleFocus = isNumeric
+    ? (e: FocusEvent<HTMLInputElement>) => e.target.select()
+    : undefined;
+
+  // Hide a literal "0" so the placeholder shows instead.
   const displayValue =
-    type === "number" && (value === 0 || value === "0") ? "" : value;
+    isNumeric && (value === 0 || value === "0") ? "" : value;
+
+  // Filter non-numeric keystrokes so users can't type letters, while still
+  // allowing digits, a single decimal point, and an empty string (for clearing).
+  const handleChange = isNumeric
+    ? (raw: string) => {
+        if (raw === "") return onChange("");
+        // Allow digits + at most one decimal point.
+        const cleaned = raw.replace(/[^\d.]/g, "");
+        const firstDot = cleaned.indexOf(".");
+        const normalized =
+          firstDot === -1
+            ? cleaned
+            : cleaned.slice(0, firstDot + 1) +
+              cleaned.slice(firstDot + 1).replace(/\./g, "");
+        onChange(normalized);
+      }
+    : onChange;
 
   return (
     <div className="w-full">
@@ -64,15 +90,17 @@ export default function Input({
           </span>
         )}
         <input
-          type={type}
+          type={renderType}
+          inputMode={inputMode}
+          pattern={pattern}
           value={displayValue}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => handleChange(e.target.value)}
           onFocus={handleFocus}
-          placeholder={placeholder ?? (type === "number" ? "0" : undefined)}
+          placeholder={placeholder ?? (isNumeric ? "0" : undefined)}
           disabled={disabled}
-          min={min}
-          max={max}
-          step={step}
+          min={isNumeric ? undefined : min}
+          max={isNumeric ? undefined : max}
+          step={isNumeric ? undefined : step}
           className={cn(
             "w-full px-4 py-3 min-h-[48px] rounded-xl border-2 bg-white transition-all duration-200",
             "text-gray-900 font-medium placeholder:text-gray-400 placeholder:font-normal",
