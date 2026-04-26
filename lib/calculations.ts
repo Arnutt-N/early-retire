@@ -386,6 +386,28 @@ export function generateSalaryTable(
     return { ...r, monthsInWindow };
   });
 
+  // Display tweak: align the first counting row's period to the calendar-
+  // precise windowStart so users see (per improve-cal.txt scenario 3 and
+  // the user's expectation): for ลาออก 2/10 → first row labeled "2/10",
+  // for ลาออก 1/6 → first row labeled "1/6". The salary itself is still
+  // the salary that took effect at the previous fiscal boundary (which
+  // is what was applied in the walk loop), and monthsInWindow already
+  // reflects the partial overlap correctly.
+  const firstCountingIdx = enriched.findIndex((r) => r.monthsInWindow > 0);
+  if (firstCountingIdx !== -1) {
+    const firstCountingRow = enriched[firstCountingIdx];
+    const rowFiscalStart = new Date(firstCountingRow.period);
+    if (rowFiscalStart.getTime() < windowStart.getTime()) {
+      firstCountingRow.period = windowStart.toISOString();
+      firstCountingRow.periodLabel = `${windowStart
+        .getDate()
+        .toString()
+        .padStart(2, "0")}/${(windowStart.getMonth() + 1)
+        .toString()
+        .padStart(2, "0")}/${toBE(windowStart.getFullYear())}`;
+    }
+  }
+
   // Append the synthetic "วันก่อนพ้นราชการ" marker row.
   //
   // Special Thai-civil-service rule: when retirement falls on a fiscal-year
