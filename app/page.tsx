@@ -205,11 +205,26 @@ export default function Home() {
     };
   }, [form.birthDate, form.startDate, form.endDate]);
 
-  const showEligibilityWarn =
-    step >= 1 &&
-    eligibilityCheck !== null &&
-    !eligibilityCheck.eligible &&
-    eligibilityAckedKey !== eligibilityKey;
+  // Modal is gated on the step-1 → step-2 transition, NOT reactively on date
+  // edits. Reason: showing it while the user is still typing the third date
+  // (which would happen as soon as it parses) feels like a false positive
+  // and was being interpreted as "system telling me to use the date picker."
+  const [pendingEligibilityWarn, setPendingEligibilityWarn] = useState(false);
+  const showEligibilityWarn = pendingEligibilityWarn;
+
+  // Wrapper used by Step 1 (PersonalInfoForm) instead of plain goNext.
+  // Validates eligibility before advancing; opens modal if invalid + not yet acked.
+  const tryGoNextFromStep1 = () => {
+    if (
+      eligibilityCheck !== null &&
+      !eligibilityCheck.eligible &&
+      eligibilityAckedKey !== eligibilityKey
+    ) {
+      setPendingEligibilityWarn(true);
+      return;
+    }
+    goNext();
+  };
 
   const performReset = () => {
     if (typeof window === "undefined") return;
@@ -227,7 +242,7 @@ export default function Home() {
       key="1"
       form={form}
       updateForm={updateForm}
-      onNext={goNext}
+      onNext={tryGoNextFromStep1}
       onBack={goBack}
     />,
     <ServicePeriodForm
@@ -356,10 +371,15 @@ export default function Home() {
         }
         confirmLabel="ดำเนินการต่อ"
         cancelLabel="กลับไปแก้ไข"
-        onConfirm={() => setEligibilityAckedKey(eligibilityKey)}
-        onCancel={() => {
+        onConfirm={() => {
+          // User acknowledges and proceeds to step 2.
           setEligibilityAckedKey(eligibilityKey);
-          setStep(1);
+          setPendingEligibilityWarn(false);
+          goNext();
+        }}
+        onCancel={() => {
+          // User wants to fix the dates — close modal, stay on step 1.
+          setPendingEligibilityWarn(false);
         }}
       />
     </main>
