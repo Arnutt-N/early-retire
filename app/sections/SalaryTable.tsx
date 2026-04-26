@@ -17,6 +17,7 @@ import {
   ChevronDown,
   CalendarRange,
   Plus,
+  Minus,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import CalendarPickerTH from "@/components/ui/CalendarPickerTH";
@@ -101,9 +102,9 @@ export default function SalaryTableSection({
     : `วันเลื่อนเงินเดือนล่าสุด → วันก่อนพ้นราชการ (${records.length} รอบ × 6 เดือน = ${totalRowMonths} เดือน)`;
 
   // "Add a row backward" — push latestAssessmentDate back one fiscal round
-  // (6 months) so generateSalaryTable adds one more historical row. Used when
-  // total months < 60 (e.g. short career or window edge case) or the user
-  // wants to manually inspect/edit an extra historical assessment.
+  // (6 months) so generateSalaryTable adds one more historical row at the
+  // start of the table. The new row's effective-date can then be edited to
+  // any custom date (4/3/2 months back, mid-year, etc.) via the pencil icon.
   const addRowBackward = () => {
     const firstPeriod = records[0]?.period ?? null;
     const anchor = firstPeriod
@@ -116,6 +117,29 @@ export default function SalaryTableSection({
     next.setMonth(next.getMonth() - 6);
     updateForm({ latestAssessmentDate: next.toISOString() });
   };
+
+  // "Remove oldest row" — push latestAssessmentDate forward one fiscal round
+  // (6 months). This shifts the table's start later, effectively dropping the
+  // oldest row. Used to undo a previous "+ Add backward" or to focus the
+  // table on more recent rounds. Disabled when there's only 1 row left.
+  const removeOldestRow = () => {
+    const firstPeriod = records[0]?.period ?? null;
+    const anchor = firstPeriod
+      ? new Date(firstPeriod)
+      : form.latestAssessmentDate
+        ? new Date(form.latestAssessmentDate)
+        : new Date();
+    if (isNaN(anchor.getTime())) return;
+    const next = new Date(anchor);
+    next.setMonth(next.getMonth() + 6);
+    // Safety: don't push assessment past the exit date
+    if (form.endDate) {
+      const exit = new Date(form.endDate);
+      if (!isNaN(exit.getTime()) && next.getTime() >= exit.getTime()) return;
+    }
+    updateForm({ latestAssessmentDate: next.toISOString() });
+  };
+  const canRemoveRow = records.length > 1;
 
   // Always show the "+ Add row backward" affordance in GFP mode (not gated on
    // window-complete) so the user can keep extending history even after the
@@ -323,36 +347,54 @@ export default function SalaryTableSection({
             >
               <p
                 className={cn(
-                  "text-xs mb-2",
+                  "text-xs mb-2 leading-relaxed",
                   windowComplete ? "text-emerald-700" : "text-amber-700",
                 )}
               >
                 {windowComplete ? (
                   <>
-                    ครบ 60 เดือนแล้ว — หากต้องการเพิ่มแถวประวัติเงินเดือนย้อนหลังเพิ่มเติม
-                    (เพื่อบันทึก % ของรอบเก่าๆ) คลิกปุ่มด้านล่าง
+                    ครบ 60 เดือนแล้ว — เพิ่ม/ลดแถวประวัติได้ตามต้องการ
+                    หรือคลิกดินสอบนแถวเพื่อแก้ไขวันที่ (4/3/2 เดือน หรือเดือนข้างหน้า) ระดับ และ %
                   </>
                 ) : (
                   <>
                     ขาดอีก <span className="font-semibold">{monthsShortBy} เดือน</span>{" "}
-                    — กดปุ่มเพื่อเพิ่มแถวประวัติเงินเดือนย้อนหลัง 1 รอบ (6 เดือน)
-                    แล้วแก้ไข % ของแถวใหม่ได้ที่ตารางด้านล่าง
+                    — เพิ่มแถวประวัติเพิ่มได้
+                    หรือคลิกดินสอบนแถวเพื่อแก้ไขวันที่ให้เป็น 4/3/2 เดือน หรือเดือนข้างหน้าก็ได้
                   </>
                 )}
               </p>
-              <button
-                type="button"
-                onClick={addRowBackward}
-                className={cn(
-                  "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer focus:outline-none focus-visible:ring-2",
-                  windowComplete
-                    ? "bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-300"
-                    : "bg-amber-600 hover:bg-amber-700 focus-visible:ring-amber-300",
-                )}
-              >
-                <Plus size={14} />
-                เพิ่มแถวประวัติย้อนหลัง 6 เดือน
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={addRowBackward}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer focus:outline-none focus-visible:ring-2",
+                    windowComplete
+                      ? "bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-300"
+                      : "bg-amber-600 hover:bg-amber-700 focus-visible:ring-amber-300",
+                  )}
+                  title="เพิ่มแถวประวัติเงินเดือนก่อนหน้า 1 รอบ (ปกติ 6 เดือน — แก้ไขเป็นวันใดก็ได้ภายหลังผ่านดินสอ)"
+                >
+                  <Plus size={14} />
+                  เพิ่มแถวประวัติเงินเดือน
+                </button>
+                <button
+                  type="button"
+                  onClick={removeOldestRow}
+                  disabled={!canRemoveRow}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:cursor-not-allowed",
+                    windowComplete
+                      ? "bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 focus-visible:ring-emerald-300 cursor-pointer"
+                      : "bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 focus-visible:ring-amber-300 cursor-pointer",
+                  )}
+                  title="ลบแถวเก่าสุด — ดันวันเลื่อนเงินเดือนล่าสุดไปข้างหน้า 1 รอบ"
+                >
+                  <Minus size={14} />
+                  ลบแถวเก่าสุด
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -817,11 +859,11 @@ export default function SalaryTableSection({
             })}
           </div>
 
-          {/* Bottom "+ Add row" — duplicates the affordance from the summary
-              card so users who scrolled past the top can still extend history
-              without scrolling back up. GFP-only, always visible. */}
+          {/* Bottom add/remove buttons — duplicates the affordances from the
+              summary card so users who scrolled past the top can still adjust
+              history without scrolling back up. GFP-only, always visible. */}
           {showExtendButton && (
-            <div className="flex justify-center">
+            <div className="flex flex-wrap justify-center gap-2">
               <button
                 type="button"
                 onClick={addRowBackward}
@@ -831,14 +873,30 @@ export default function SalaryTableSection({
                     ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 focus-visible:ring-emerald-300"
                     : "border-amber-300 text-amber-700 hover:bg-amber-50 focus-visible:ring-amber-300",
                 )}
+                title="เพิ่มแถวประวัติเงินเดือนก่อนหน้า 1 รอบ (ปกติ 6 เดือน — แก้ไขเป็นวันใดก็ได้ผ่านดินสอ)"
               >
                 <Plus size={16} />
-                เพิ่มแถวประวัติย้อนหลัง 6 เดือน
+                เพิ่มแถวประวัติเงินเดือน
                 {!windowComplete && (
                   <span className="text-[11px] font-normal opacity-75">
                     (ขาดอีก {monthsShortBy} เดือน)
                   </span>
                 )}
+              </button>
+              <button
+                type="button"
+                onClick={removeOldestRow}
+                disabled={!canRemoveRow}
+                className={cn(
+                  "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:cursor-not-allowed",
+                  windowComplete
+                    ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 focus-visible:ring-emerald-300 cursor-pointer"
+                    : "border-amber-300 text-amber-700 hover:bg-amber-50 focus-visible:ring-amber-300 cursor-pointer",
+                )}
+                title="ลบแถวเก่าสุด — ดันวันเลื่อนเงินเดือนล่าสุดไปข้างหน้า 1 รอบ"
+              >
+                <Minus size={16} />
+                ลบแถวเก่าสุด
               </button>
             </div>
           )}
