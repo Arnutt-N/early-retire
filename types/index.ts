@@ -60,6 +60,11 @@ export interface SalaryRecord {
    * Mirrors lib/calculations.ts SalaryRecord — keep in sync.
    */
   monthsInWindow: number;
+  /**
+   * True for the synthetic "วันก่อนพ้นราชการ" marker row appended at the end.
+   * Mirrors lib/calculations.ts SalaryRecord — keep in sync.
+   */
+  isExitMarker?: boolean;
 }
 
 export interface FormState {

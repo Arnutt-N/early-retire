@@ -200,6 +200,15 @@ export interface SalaryRecord {
    * for historical edit context, but not counted in the average).
    */
   monthsInWindow: number;
+  /**
+   * True if this row is the synthetic "วันก่อนพ้นราชการ" marker appended at
+   * the end of the table. It carries the salary that applied on the last day
+   * of work (= same as the previous fiscal-round row), is not counted in the
+   * 60-month average (monthsInWindow = 0), and is rendered as informational
+   * only — not editable, no pencil/trash icons. For non-GFP this row is the
+   * "เงินเดือนสุดท้าย" used directly by the lump-sum / monthly formula.
+   */
+  isExitMarker?: boolean;
 }
 
 /**
@@ -347,7 +356,7 @@ export function generateSalaryTable(
   const windowStart = new Date(endDate);
   windowStart.setMonth(windowStart.getMonth() - 60);
 
-  return records.map((r, idx) => {
+  const enriched: SalaryRecord[] = records.map((r, idx) => {
     const rowStart = new Date(r.period);
     let rowEnd: Date;
     if (idx < records.length - 1) {
@@ -370,4 +379,35 @@ export function generateSalaryTable(
 
     return { ...r, monthsInWindow };
   });
+
+  // Append the synthetic "วันก่อนพ้นราชการ" marker row. Carries the salary
+  // that applied on the last day of work (same as the previous row's
+  // newSalary — exit doesn't trigger a raise). For non-GFP this is the
+  // "เงินเดือนสุดท้าย" that drives the formula. monthsInWindow = 0 so it
+  // never affects the GFP averaging.
+  if (enriched.length > 0) {
+    const lastReal = enriched[enriched.length - 1];
+    const markerDate = new Date(endDate);
+    markerDate.setDate(markerDate.getDate() - 1);
+    enriched.push({
+      period: markerDate.toISOString(),
+      periodLabel: `${markerDate.getDate().toString().padStart(2, "0")}/${(
+        markerDate.getMonth() + 1
+      ).toString().padStart(2, "0")}/${toBE(markerDate.getFullYear())}`,
+      level: lastReal.level,
+      oldSalary: lastReal.newSalary,
+      maxSalary: lastReal.maxSalary,
+      base: 0,
+      percent: 0,
+      increase: 0,
+      actualIncrease: 0,
+      newSalary: lastReal.newSalary,
+      isEstimated: false,
+      isCurrent: false,
+      monthsInWindow: 0,
+      isExitMarker: true,
+    });
+  }
+
+  return enriched;
 }

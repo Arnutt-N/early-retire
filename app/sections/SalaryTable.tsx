@@ -16,8 +16,7 @@ import {
   Check,
   ChevronDown,
   CalendarRange,
-  Plus,
-  Minus,
+  Flag,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import CalendarPickerTH from "@/components/ui/CalendarPickerTH";
@@ -102,50 +101,12 @@ export default function SalaryTableSection({
     : `วันเลื่อนเงินเดือนล่าสุด → วันก่อนพ้นราชการ (${records.length} รอบ × 6 เดือน = ${totalRowMonths} เดือน)`;
 
   // "Add a row backward" — push latestAssessmentDate back one fiscal round
-  // (6 months) so generateSalaryTable adds one more historical row at the
-  // start of the table. The new row's effective-date can then be edited to
-  // any custom date (4/3/2 months back, mid-year, etc.) via the pencil icon.
-  const addRowBackward = () => {
-    const firstPeriod = records[0]?.period ?? null;
-    const anchor = firstPeriod
-      ? new Date(firstPeriod)
-      : form.latestAssessmentDate
-        ? new Date(form.latestAssessmentDate)
-        : new Date();
-    if (isNaN(anchor.getTime())) return;
-    const next = new Date(anchor);
-    next.setMonth(next.getMonth() - 6);
-    updateForm({ latestAssessmentDate: next.toISOString() });
-  };
-
-  // "Remove oldest row" — push latestAssessmentDate forward one fiscal round
-  // (6 months). This shifts the table's start later, effectively dropping the
-  // oldest row. Used to undo a previous "+ Add backward" or to focus the
-  // table on more recent rounds. Disabled when there's only 1 row left.
-  const removeOldestRow = () => {
-    const firstPeriod = records[0]?.period ?? null;
-    const anchor = firstPeriod
-      ? new Date(firstPeriod)
-      : form.latestAssessmentDate
-        ? new Date(form.latestAssessmentDate)
-        : new Date();
-    if (isNaN(anchor.getTime())) return;
-    const next = new Date(anchor);
-    next.setMonth(next.getMonth() + 6);
-    // Safety: don't push assessment past the exit date
-    if (form.endDate) {
-      const exit = new Date(form.endDate);
-      if (!isNaN(exit.getTime()) && next.getTime() >= exit.getTime()) return;
-    }
-    updateForm({ latestAssessmentDate: next.toISOString() });
-  };
-  const canRemoveRow = records.length > 1;
-
-  // Always show the "+ Add row backward" affordance in GFP mode (not gated on
-   // window-complete) so the user can keep extending history even after the
-   // 60-month window is full — useful for documenting earlier fiscal rounds
-   // they remember and want to override per-row.
-  const showExtendButton = isGfp && records.length > 0;
+  // The +/− auto buttons are removed — the user picks the start date directly
+  // via the CalendarPickerTH below, which lets them choose any date (custom
+  // 4/3/2 months back or forward, mid-year, etc.) instead of being limited
+  // to 6-month fiscal-round shifts. Each row's pencil/trash icons handle
+  // per-row deletion, so a global "remove oldest" button is also redundant.
+  const showAssessmentPicker = isGfp && records.length > 0;
 
   // Per-row badge that tells the user whether this row is part of the 60-month
   // averaging window — and if partial, how many months it actually contributes.
@@ -338,62 +299,27 @@ export default function SalaryTableSection({
             </div>
           )}
 
-          {showExtendButton && (
+          {showAssessmentPicker && (
             <div
               className={cn(
                 "mt-4 pt-4 border-t",
                 windowComplete ? "border-emerald-200" : "border-amber-200",
               )}
             >
-              <p
+              <label
                 className={cn(
-                  "text-xs mb-2 leading-relaxed",
+                  "block text-[11px] uppercase tracking-wide font-semibold mb-1.5",
                   windowComplete ? "text-emerald-700" : "text-amber-700",
                 )}
               >
-                {windowComplete ? (
-                  <>
-                    ครบ 60 เดือนแล้ว — เพิ่ม/ลดแถวประวัติได้ตามต้องการ
-                    หรือคลิกดินสอบนแถวเพื่อแก้ไขวันที่ (4/3/2 เดือน หรือเดือนข้างหน้า) ระดับ และ %
-                  </>
-                ) : (
-                  <>
-                    ขาดอีก <span className="font-semibold">{monthsShortBy} เดือน</span>{" "}
-                    — เพิ่มแถวประวัติเพิ่มได้
-                    หรือคลิกดินสอบนแถวเพื่อแก้ไขวันที่ให้เป็น 4/3/2 เดือน หรือเดือนข้างหน้าก็ได้
-                  </>
-                )}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={addRowBackward}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer focus:outline-none focus-visible:ring-2",
-                    windowComplete
-                      ? "bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-300"
-                      : "bg-amber-600 hover:bg-amber-700 focus-visible:ring-amber-300",
-                  )}
-                  title="เพิ่มแถวประวัติเงินเดือนก่อนหน้า 1 รอบ (ปกติ 6 เดือน — แก้ไขเป็นวันใดก็ได้ภายหลังผ่านดินสอ)"
-                >
-                  <Plus size={14} />
-                  เพิ่มแถวประวัติเงินเดือน
-                </button>
-                <button
-                  type="button"
-                  onClick={removeOldestRow}
-                  disabled={!canRemoveRow}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:cursor-not-allowed",
-                    windowComplete
-                      ? "bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 focus-visible:ring-emerald-300 cursor-pointer"
-                      : "bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 focus-visible:ring-amber-300 cursor-pointer",
-                  )}
-                  title="ลบแถวเก่าสุด — ดันวันเลื่อนเงินเดือนล่าสุดไปข้างหน้า 1 รอบ"
-                >
-                  <Minus size={14} />
-                  ลบแถวเก่าสุด
-                </button>
+                วันที่เลื่อนเงินเดือนล่าสุด
+              </label>
+              <div className="bg-white rounded-lg">
+                <CalendarPickerTH
+                  value={form.latestAssessmentDate}
+                  onChange={(d) => updateForm({ latestAssessmentDate: d })}
+                  helper="เลื่อนถอยหลังเพื่อเพิ่มแถวประวัติ — เลื่อนไปข้างหน้าเพื่อลด — ระบบจะใช้รอบปีงบ (1/4 หรือ 1/10) ที่ตรงกัน"
+                />
               </div>
             </div>
           )}
@@ -446,6 +372,72 @@ export default function SalaryTableSection({
                 </thead>
                 <tbody>
                   {records.map((r, i) => {
+                    // Synthetic exit-marker row — informational only.
+                    // Carries the salary on the day-before-exit (= last salary).
+                    // Not editable, no pencil/trash. For non-GFP it's prominent
+                    // (this IS the salary used by the lump-sum / monthly formula).
+                    if (r.isExitMarker) {
+                      return (
+                        <tr
+                          key={i}
+                          className={cn(
+                            "border-b border-gray-100 last:border-b-0",
+                            isGfp ? "bg-gray-50/60" : "bg-indigo-50/40",
+                          )}
+                        >
+                          <td className="px-3 py-2.5 align-middle min-w-[180px]">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-gray-900 tabular-nums">
+                                {formatThaiDate(r.period)}
+                              </span>
+                              <span
+                                className={cn(
+                                  "inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded",
+                                  isGfp
+                                    ? "bg-gray-100 text-gray-600"
+                                    : "bg-indigo-100 text-indigo-700",
+                                )}
+                                title={
+                                  isGfp
+                                    ? "วันก่อนพ้นราชการ — ไม่ถูกนับเข้าค่าเฉลี่ย 60 เดือน"
+                                    : "วันก่อนพ้นราชการ — เงินเดือนสุดท้ายที่ใช้คำนวณ"
+                                }
+                              >
+                                <Flag size={10} />
+                                วันก่อนพ้นราชการ
+                              </span>
+                              {!isGfp && (
+                                <span
+                                  className="px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-600 text-white rounded"
+                                  title="สูตรไม่เป็นสมาชิก กบข. ใช้เงินเดือนของแถวนี้"
+                                >
+                                  เงินเดือนสุดท้าย
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle min-w-[160px] text-gray-600">
+                            {LEVEL_DISPLAY_ORDER.find((l) => l.value === r.level)
+                              ?.label ?? r.level}
+                          </td>
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-400">—</td>
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-400">—</td>
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-400">—</td>
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-400">—</td>
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-400">—</td>
+                          <td
+                            className={cn(
+                              "px-3 py-2.5 align-middle text-right tabular-nums font-bold",
+                              isGfp ? "text-gray-700" : "text-indigo-700",
+                            )}
+                          >
+                            {formatNumber(r.newSalary)}
+                          </td>
+                          <td className="px-3 py-2.5 align-middle text-center text-gray-300">—</td>
+                        </tr>
+                      );
+                    }
+
                     const override = form.salaryOverrides[i];
                     const hasOverride =
                       !!override?.level ||
@@ -650,6 +642,57 @@ export default function SalaryTableSection({
           {/* === Mobile: compact card list === */}
           <div className="md:hidden space-y-2">
             {records.map((r, i) => {
+              // Synthetic exit-marker — render as a non-interactive info card
+              // (no expand/edit/delete). For non-GFP it carries the salary used
+              // by the formula; for GFP it's purely informational.
+              if (r.isExitMarker) {
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      "rounded-xl border shadow-[var(--shadow-e1)] px-3 py-2.5",
+                      isGfp
+                        ? "bg-gray-50 border-gray-200"
+                        : "bg-indigo-50/40 border-indigo-200",
+                    )}
+                  >
+                    <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-semibold text-gray-900 tabular-nums">
+                            {formatThaiDate(r.period)}
+                          </span>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] font-medium rounded",
+                              isGfp
+                                ? "bg-gray-100 text-gray-600"
+                                : "bg-indigo-100 text-indigo-700",
+                            )}
+                          >
+                            <Flag size={9} />
+                            วันก่อนพ้นราชการ
+                          </span>
+                          {!isGfp && (
+                            <span className="px-1 py-0.5 text-[9px] font-semibold bg-indigo-600 text-white rounded">
+                              เงินเดือนสุดท้าย
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span
+                        className={cn(
+                          "text-xs tabular-nums font-bold",
+                          isGfp ? "text-gray-700" : "text-indigo-700",
+                        )}
+                      >
+                        {formatNumber(r.newSalary)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+
               const override = form.salaryOverrides[i];
               const hasOverride =
                 !!override?.level ||
@@ -859,47 +902,6 @@ export default function SalaryTableSection({
             })}
           </div>
 
-          {/* Bottom add/remove buttons — duplicates the affordances from the
-              summary card so users who scrolled past the top can still adjust
-              history without scrolling back up. GFP-only, always visible. */}
-          {showExtendButton && (
-            <div className="flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                onClick={addRowBackward}
-                className={cn(
-                  "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed text-sm font-medium transition-colors cursor-pointer focus:outline-none focus-visible:ring-2",
-                  windowComplete
-                    ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 focus-visible:ring-emerald-300"
-                    : "border-amber-300 text-amber-700 hover:bg-amber-50 focus-visible:ring-amber-300",
-                )}
-                title="เพิ่มแถวประวัติเงินเดือนก่อนหน้า 1 รอบ (ปกติ 6 เดือน — แก้ไขเป็นวันใดก็ได้ผ่านดินสอ)"
-              >
-                <Plus size={16} />
-                เพิ่มแถวประวัติเงินเดือน
-                {!windowComplete && (
-                  <span className="text-[11px] font-normal opacity-75">
-                    (ขาดอีก {monthsShortBy} เดือน)
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={removeOldestRow}
-                disabled={!canRemoveRow}
-                className={cn(
-                  "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:cursor-not-allowed",
-                  windowComplete
-                    ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 focus-visible:ring-emerald-300 cursor-pointer"
-                    : "border-amber-300 text-amber-700 hover:bg-amber-50 focus-visible:ring-amber-300 cursor-pointer",
-                )}
-                title="ลบแถวเก่าสุด — ดันวันเลื่อนเงินเดือนล่าสุดไปข้างหน้า 1 รอบ"
-              >
-                <Minus size={16} />
-                ลบแถวเก่าสุด
-              </button>
-            </div>
-          )}
         </>
       )}
 

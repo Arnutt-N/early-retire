@@ -206,41 +206,63 @@ export default function ResultSection({
       )}
 
       {/* Salary Summary */}
-      {salaryRecords.length > 0 && (
-        <Card hover={false} elevation="e2">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp size={20} className="text-violet-500" />
-            <h3 className="font-semibold text-gray-900">สรุปเงินเดือน</h3>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <p className="text-xs text-gray-500 mb-1">จำนวนรอบ</p>
-              <p className="font-bold text-gray-900">{salaryRecords.length} รอบ</p>
+      {salaryRecords.length > 0 && (() => {
+        // Filter out the synthetic exit-marker row from stats — it doesn't
+        // represent an actual salary round, only the day-before-exit display.
+        const realRecords = salaryRecords.filter((r) => !r.isExitMarker);
+        const lastRow = realRecords[realRecords.length - 1] ?? null;
+        // GFP uses weighted-by-monthsInWindow average to match the formula
+        // (handles partial boundary rows correctly). Non-GFP doesn't use this
+        // stat. Falls back to a naive mean when monthsInWindow is unavailable
+        // (shouldn't happen, but defensive).
+        const totalMonthsInWindow = realRecords.reduce(
+          (s, r) => s + r.monthsInWindow,
+          0,
+        );
+        const sumWeighted = realRecords.reduce(
+          (s, r) => s + r.newSalary * r.monthsInWindow,
+          0,
+        );
+        const avg60 =
+          totalMonthsInWindow > 0
+            ? sumWeighted / totalMonthsInWindow
+            : realRecords.reduce((s, r) => s + r.newSalary, 0) /
+              (realRecords.length || 1);
+        return (
+          <Card hover={false} elevation="e2">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp size={20} className="text-violet-500" />
+              <h3 className="font-semibold text-gray-900">สรุปเงินเดือน</h3>
             </div>
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <p className="text-xs text-gray-500 mb-1">เงินเดือนเริ่มต้น</p>
-              <p className="font-bold text-gray-900">{formatNumber(salaryRecords[0]?.oldSalary || 0)}</p>
-            </div>
-            <div className="p-3 bg-gray-50 rounded-xl">
-              <p className="text-xs text-gray-500 mb-1">เงินเดือนสุดท้าย</p>
-              <p className="font-bold text-gray-900">
-                {formatNumber(salaryRecords[salaryRecords.length - 1]?.newSalary || 0)}
-              </p>
-            </div>
-            {mode === "gfp" && (
-              <div className="p-3 bg-violet-50 rounded-xl">
-                <p className="text-xs text-violet-600 mb-1">เงินเฉลี่ย 60 เดือน</p>
-                <p className="font-bold text-violet-700">
-                  {formatNumber(
-                    salaryRecords.reduce((s, r) => s + r.newSalary, 0) /
-                      (salaryRecords.length || 1),
-                  )}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">จำนวนรอบ</p>
+                <p className="font-bold text-gray-900">{realRecords.length} รอบ</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">เงินเดือนเริ่มต้น</p>
+                <p className="font-bold text-gray-900">
+                  {formatNumber(realRecords[0]?.oldSalary || 0)}
                 </p>
               </div>
-            )}
-          </div>
-        </Card>
-      )}
+              <div className="p-3 bg-gray-50 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">เงินเดือนสุดท้าย</p>
+                <p className="font-bold text-gray-900">
+                  {formatNumber(lastRow?.newSalary || 0)}
+                </p>
+              </div>
+              {mode === "gfp" && (
+                <div className="p-3 bg-violet-50 rounded-xl">
+                  <p className="text-xs text-violet-600 mb-1">เงินเฉลี่ย 60 เดือน</p>
+                  <p className="font-bold text-violet-700">
+                    {formatNumber(avg60)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* Compare: Lump-Sum vs Monthly Pension — eligibility & benefits */}
       <motion.div
