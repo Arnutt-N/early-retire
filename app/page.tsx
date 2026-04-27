@@ -176,7 +176,7 @@ export default function Home() {
     if (form.mode === "non-gfp") {
       return calculatePensionNonGfp(lastSalary, totalServiceYears);
     }
-    return calculatePensionGfp(avg60Months, totalServiceYears);
+    return calculatePensionGfp(avg60Months, lastSalary, totalServiceYears);
   }, [form.mode, lastSalary, avg60Months, totalServiceYears]);
 
   const livelihood = useMemo(() => {

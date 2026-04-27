@@ -131,11 +131,19 @@ export function calculatePensionNonGfp(lastSalary: number, serviceYears: number)
   };
 }
 
-export function calculatePensionGfp(avg60Months: number, serviceYears: number): PensionResult {
+export function calculatePensionGfp(
+  avg60Months: number,
+  lastSalary: number,
+  serviceYears: number,
+): PensionResult {
+  // Per Thai civil-service rules: บำเหน็จ (lump-sum gratuity) uses last-month
+  // salary for BOTH GFP and non-GFP members. Only บำนาญ (monthly pension)
+  // differs — GFP uses the 60-month average with a 70% cap, non-GFP uses
+  // last-month salary directly.
   const formula1 = (avg60Months * serviceYears) / 50;
   const formula2 = avg60Months * 0.7;
   const monthly = Math.min(formula1, formula2);
-  const lumpSum = avg60Months * serviceYears;
+  const lumpSum = lastSalary * serviceYears;
   return {
     monthly: Math.round(monthly * 100) / 100,
     lumpSum: Math.round(lumpSum * 100) / 100,
