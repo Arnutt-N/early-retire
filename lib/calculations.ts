@@ -107,7 +107,16 @@ export function calculateServicePeriod(
   );
   const safeLeave = Math.max(0, Math.floor(Number.isFinite(leaveDays) ? leaveDays : 0));
   const totalDays = Math.max(0, rawTotalDays - safeLeave);
-  const totalYears = totalDays / 365.25;
+  // Service-years formula per Thai civil-service convention (used in HR/pension
+  // documents and Excel templates): Y + M/12 + D/365, then subtract leave days
+  // as a fraction of 365. Months are treated as exactly 1/12 of a year and
+  // days as 1/365 — NOT calendar-precise (which would use 365.25 and real
+  // month lengths). The official-doc convention takes precedence so users
+  // can reconcile the calculator output against their own paperwork.
+  const totalYears = Math.max(
+    0,
+    years + months / 12 + days / 365 - safeLeave / 365,
+  );
 
   return { years, months, days, totalDays, totalYears };
 }
