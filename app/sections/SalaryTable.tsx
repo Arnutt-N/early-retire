@@ -430,22 +430,29 @@ export default function SalaryTableSection({
                 </thead>
                 <tbody>
                   {records.map((r, i) => {
-                    // Synthetic exit-marker row — informational only.
-                    // Carries the salary on the day-before-exit (= last salary).
-                    // Not editable, no pencil/trash. For non-GFP it's prominent
-                    // (this IS the salary used by the lump-sum / monthly formula).
+                    // Synthetic exit-marker row. The date is locked (= endDate − 1)
+                    // but level / oldSalary / % can be overridden via the edit form
+                    // — same lifecycle as regular rows.
                     if (r.isExitMarker) {
-                      // When exit is on a fiscal boundary (1/4 or 1/10), the
-                      // marker carries an actual 1-day raise — show its full
-                      // numeric breakdown. Otherwise the row is informational
-                      // and numeric cells are dashed out.
                       const hasRaise = r.actualIncrease > 0;
+                      const markerOverride = form.salaryOverrides[i];
+                      const markerHasOverride =
+                        !!markerOverride?.level ||
+                        markerOverride?.percent !== null ||
+                        markerOverride?.oldSalary !== null;
+                      const markerEditing = editingIdx === i;
+                      const markerDisplayLevel = markerOverride?.level ?? r.level;
+
                       return (
                         <tr
                           key={i}
                           className={cn(
                             "border-b border-gray-100 last:border-b-0",
-                            isGfp ? "bg-gray-50/60" : "bg-indigo-50/40",
+                            markerEditing
+                              ? "bg-violet-50/40"
+                              : isGfp
+                                ? "bg-gray-50/60"
+                                : "bg-indigo-50/40",
                           )}
                         >
                           <td className="px-3 py-2.5 align-middle min-w-[180px]">
@@ -460,13 +467,7 @@ export default function SalaryTableSection({
                                     ? "bg-gray-100 text-gray-600"
                                     : "bg-indigo-100 text-indigo-700",
                                 )}
-                                title={
-                                  isGfp
-                                    ? hasRaise
-                                      ? "วันก่อนพ้นราชการ — เลื่อนเงินเดือน 1 วัน ก่อนเกษียณ (นับใน 60 เดือน)"
-                                      : "วันก่อนพ้นราชการ — ไม่ถูกนับเข้าค่าเฉลี่ย 60 เดือน"
-                                    : "วันก่อนพ้นราชการ — เงินเดือนสุดท้ายที่ใช้คำนวณ"
-                                }
+                                title="วันก่อนพ้นราชการ — แก้ไขวันที่ไม่ได้ (ผูกกับวันพ้นราชการ)"
                               >
                                 <Flag size={10} />
                                 วันก่อนพ้นราชการ
@@ -482,28 +483,108 @@ export default function SalaryTableSection({
                               {isGfp && hasRaise && renderMonthsBadge(r.monthsInWindow)}
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 align-middle min-w-[160px] text-gray-600">
-                            {LEVEL_DISPLAY_ORDER.find((l) => l.value === r.level)
-                              ?.label ?? r.level}
+                          <td className="px-3 py-2.5 align-middle min-w-[160px]">
+                            {markerEditing ? (
+                              <select
+                                value={markerDisplayLevel}
+                                onChange={(e) =>
+                                  updateOverride(i, { level: e.target.value })
+                                }
+                                className="w-full px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs focus:outline-none focus:border-violet-500 cursor-pointer"
+                              >
+                                {LEVEL_DISPLAY_ORDER.map((l) => (
+                                  <option key={l.value} value={l.value}>
+                                    {l.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="text-gray-600">
+                                {LEVEL_DISPLAY_ORDER.find(
+                                  (l) => l.value === markerDisplayLevel,
+                                )?.label ?? markerDisplayLevel}
+                              </span>
+                            )}
                           </td>
-                          <td className="px-3 py-2.5 align-middle text-right tabular-nums">
-                            {hasRaise ? formatNumber(r.oldSalary) : <span className="text-gray-400">—</span>}
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums min-w-[110px]">
+                            {markerEditing ? (
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                pattern="[0-9]*[.]?[0-9]*"
+                                value={oldSalaryDraft}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const cleaned = e.target.value
+                                    .replace(/[^\d.]/g, "")
+                                    .replace(/(\..*?)\..*/, "$1");
+                                  setOldSalaryDraft(cleaned);
+                                  const v = parseFloat(cleaned);
+                                  updateOverride(i, {
+                                    oldSalary: isNaN(v) ? null : v,
+                                  });
+                                }}
+                                className="w-full px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-right text-xs font-medium focus:outline-none focus:border-violet-500"
+                              />
+                            ) : hasRaise ? (
+                              formatNumber(r.oldSalary)
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-500">
-                            {hasRaise ? formatNumber(r.maxSalary) : <span className="text-gray-400">—</span>}
+                            {hasRaise || markerEditing ? (
+                              formatNumber(r.maxSalary)
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 align-middle text-right tabular-nums text-gray-500">
-                            {hasRaise ? formatNumber(r.base) : <span className="text-gray-400">—</span>}
+                            {hasRaise || markerEditing ? (
+                              formatNumber(r.base)
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
                           </td>
-                          <td className="px-3 py-2.5 align-middle text-right tabular-nums">
-                            {hasRaise ? (
-                              <span className="font-medium text-gray-800">{r.percent.toFixed(2)}%</span>
+                          <td className="px-3 py-2.5 align-middle text-right tabular-nums min-w-[80px]">
+                            {markerEditing ? (
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                pattern="[0-9]*[.]?[0-9]*"
+                                value={percentDraft}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const cleaned = e.target.value
+                                    .replace(/[^\d.]/g, "")
+                                    .replace(/(\..*?)\..*/, "$1");
+                                  setPercentDraft(cleaned);
+                                  const v = parseFloat(cleaned);
+                                  updateOverride(i, {
+                                    percent: isNaN(v) ? null : v,
+                                  });
+                                }}
+                                className={cn(
+                                  "w-full px-2 py-1.5 rounded-lg border bg-white text-right text-xs font-medium focus:outline-none",
+                                  Number(percentDraft) > 6
+                                    ? "border-red-300 focus:border-red-500"
+                                    : "border-gray-200 focus:border-violet-500",
+                                )}
+                              />
+                            ) : hasRaise ? (
+                              <span className="font-medium text-gray-800">
+                                {r.percent.toFixed(2)}%
+                              </span>
                             ) : (
                               <span className="text-gray-400">—</span>
                             )}
                           </td>
                           <td className="px-3 py-2.5 align-middle text-right tabular-nums text-emerald-600 font-semibold">
-                            {hasRaise ? `+${formatNumber(r.actualIncrease)}` : <span className="text-gray-400">—</span>}
+                            {hasRaise ? (
+                              `+${formatNumber(r.actualIncrease)}`
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
                           </td>
                           <td
                             className={cn(
@@ -513,7 +594,45 @@ export default function SalaryTableSection({
                           >
                             {formatNumber(r.newSalary)}
                           </td>
-                          <td className="px-3 py-2.5 align-middle text-center text-gray-300">—</td>
+                          <td className="px-3 py-2.5 align-middle text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {markerEditing ? (
+                                <button
+                                  type="button"
+                                  onClick={() => stopEdit()}
+                                  aria-label="บันทึกการแก้ไขแถววันก่อนพ้นราชการ"
+                                  className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
+                                  title="เสร็จสิ้น"
+                                >
+                                  <Check size={16} />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => startEdit(i)}
+                                  aria-label="แก้ไขแถววันก่อนพ้นราชการ"
+                                  className="p-1.5 rounded-md text-violet-600 hover:bg-violet-50 transition-colors cursor-pointer"
+                                  title="แก้ไขแถวนี้"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => clearOverride(i)}
+                                disabled={!markerHasOverride}
+                                aria-label="ล้างการแก้ไขแถววันก่อนพ้นราชการ"
+                                className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                title={
+                                  markerHasOverride
+                                    ? "ลบการแก้ไขแถวนี้ (กลับเป็นค่าเริ่มต้น)"
+                                    : "ยังไม่มีการแก้ไขที่จะลบ"
+                                }
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     }
@@ -748,17 +867,27 @@ export default function SalaryTableSection({
               // (no expand/edit/delete). For non-GFP it carries the salary used
               // by the formula; for GFP it's purely informational.
               if (r.isExitMarker) {
+                const markerOverride = form.salaryOverrides[i];
+                const markerHasOverride =
+                  !!markerOverride?.level ||
+                  markerOverride?.percent !== null ||
+                  markerOverride?.oldSalary !== null;
+                const markerEditing = editingIdx === i;
+                const markerDisplayLevel = markerOverride?.level ?? r.level;
+
                 return (
                   <div
                     key={i}
                     className={cn(
-                      "rounded-xl border shadow-[var(--shadow-e1)] px-3 py-2.5",
-                      isGfp
-                        ? "bg-gray-50 border-gray-200"
-                        : "bg-indigo-50/40 border-indigo-200",
+                      "rounded-xl border shadow-[var(--shadow-e1)] overflow-hidden",
+                      markerEditing
+                        ? "bg-violet-50/30 border-violet-300"
+                        : isGfp
+                          ? "bg-gray-50 border-gray-200"
+                          : "bg-indigo-50/40 border-indigo-200",
                     )}
                   >
-                    <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+                    <div className="grid grid-cols-[1fr_auto] items-center gap-2 px-3 py-2.5">
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs font-semibold text-gray-900 tabular-nums">
@@ -790,6 +919,122 @@ export default function SalaryTableSection({
                       >
                         {formatNumber(r.newSalary)}
                       </span>
+                    </div>
+
+                    {markerEditing && (
+                      <div className="px-3 pb-3 space-y-2.5 border-t border-gray-100 pt-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                            ระดับตำแหน่ง
+                          </label>
+                          <select
+                            value={markerDisplayLevel}
+                            onChange={(e) =>
+                              updateOverride(i, { level: e.target.value })
+                            }
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs focus:outline-none focus:border-violet-500 cursor-pointer"
+                          >
+                            {LEVEL_DISPLAY_ORDER.map((l) => (
+                              <option key={l.value} value={l.value}>
+                                {l.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                            เงินเดือนเดิม
+                            <span className="ml-1 text-gray-400">
+                              (ก่อนเลื่อน)
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            pattern="[0-9]*[.]?[0-9]*"
+                            value={oldSalaryDraft}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const cleaned = e.target.value
+                                .replace(/[^\d.]/g, "")
+                                .replace(/(\..*?)\..*/, "$1");
+                              setOldSalaryDraft(cleaned);
+                              const v = parseFloat(cleaned);
+                              updateOverride(i, {
+                                oldSalary: isNaN(v) ? null : v,
+                              });
+                            }}
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-right text-xs font-medium focus:outline-none focus:border-violet-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                            % เลื่อน
+                            <span className="ml-1 text-gray-400">
+                              (สูงสุด 6%)
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            pattern="[0-9]*[.]?[0-9]*"
+                            value={percentDraft}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const cleaned = e.target.value
+                                .replace(/[^\d.]/g, "")
+                                .replace(/(\..*?)\..*/, "$1");
+                              setPercentDraft(cleaned);
+                              const v = parseFloat(cleaned);
+                              updateOverride(i, {
+                                percent: isNaN(v) ? null : v,
+                              });
+                            }}
+                            className={cn(
+                              "w-full px-3 py-2 rounded-lg border bg-white text-right text-xs font-medium focus:outline-none",
+                              Number(percentDraft) > 6
+                                ? "border-red-300 focus:border-red-500"
+                                : "border-gray-200 focus:border-violet-500",
+                            )}
+                          />
+                          {Number(percentDraft) > 6 && (
+                            <p className="mt-1 text-[10px] text-red-500">
+                              เกิน 6% — โปรดตรวจสอบ
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-gray-100">
+                      {markerEditing ? (
+                        <button
+                          type="button"
+                          onClick={() => stopEdit()}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
+                        >
+                          <Check size={14} />
+                          เสร็จสิ้น
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(i)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors cursor-pointer"
+                        >
+                          <Pencil size={12} />
+                          แก้ไข
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => clearOverride(i)}
+                        disabled={!markerHasOverride}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500"
+                      >
+                        <Trash2 size={12} />
+                        ลบ
+                      </button>
                     </div>
                   </div>
                 );

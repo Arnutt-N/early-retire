@@ -258,9 +258,19 @@ export function generateSalaryTable(
   const defaultBaseInfo = getSalaryBaseForLevel(level, salaryBases);
   if (!defaultBaseInfo) return records;
 
+  // Avg % for future-projection rows. Filter > 0 (ignoring blank rounds) and
+  // round to 1 decimal place to match the value displayed in Step 4
+  // (ค่าเฉลี่ยการเลื่อนเงินเดือน) — keeps the calculation table's "ประมาณ"
+  // rows consistent with the user-facing summary. Falls back to 3.5% if no
+  // valid entries.
+  const validIncreases = increases.filter((v) => !isNaN(v) && v > 0);
   const avgPercent =
-    increases.length > 0
-      ? increases.reduce((a, b) => a + b, 0) / increases.length
+    validIncreases.length > 0
+      ? Math.round(
+          (validIncreases.reduce((a, b) => a + b, 0) /
+            validIncreases.length) *
+            10,
+        ) / 10
       : 3.5;
 
   // Anchor: day BEFORE retirement (per improve-flow-logic.txt #8)
@@ -599,48 +609,72 @@ export function generateSalaryTable(
     const lastRealPeriodMs = new Date(lastReal.period).getTime();
     const skipMarker = markerDate.getTime() === lastRealPeriodMs;
 
+    // The marker row's positional index = enriched.length (next push slot).
+    // Per-row overrides[] is indexed by record position, so consult that slot
+    // for level/percent/oldSalary overrides on the marker.
+    const markerIdx = enriched.length;
+    const markerOverride = overrides[markerIdx];
+    const markerLevel = markerOverride?.level ?? lastReal.level;
+    const markerBaseInfo =
+      getSalaryBaseForLevel(markerLevel, salaryBases) ??
+      getSalaryBaseForLevel(lastReal.level, salaryBases);
+
     // Detect fiscal-boundary exit: endDate is exactly 1 April or 1 October.
     const exitDay = endDate.getDate();
     const exitMonth = endDate.getMonth(); // 0-based: 3 = Apr, 9 = Oct
     const isFiscalBoundaryExit =
       exitDay === 1 && (exitMonth === 3 || exitMonth === 9);
 
-    let markerOldSalary = lastReal.newSalary;
-    let markerNewSalary = lastReal.newSalary;
+    // Default % for the marker: avgPercent on fiscal-boundary exits (the
+    // legitimate day-before-exit raise), 0 otherwise. Override wins when set.
+    const overridePercent = markerOverride?.percent;
+    const hasPercentOverride =
+      overridePercent != null && Number.isFinite(overridePercent);
+    const effectivePercent = hasPercentOverride
+      ? overridePercent
+      : isFiscalBoundaryExit
+        ? avgPercent
+        : 0;
+
+    // oldSalary: override pins it, else chain from previous row.
+    const overrideOldSalary = markerOverride?.oldSalary;
+    const hasOldOverride =
+      overrideOldSalary != null && Number.isFinite(overrideOldSalary);
+    const markerOldSalary = hasOldOverride
+      ? overrideOldSalary
+      : lastReal.newSalary;
+
+    let markerNewSalary = markerOldSalary;
     let markerBase = 0;
-    let markerPercent = 0;
     let markerIncrease = 0;
     let markerActualIncrease = 0;
     let markerMonthsInWindow = 0;
 
-    if (isFiscalBoundaryExit) {
-      // Apply the day-before-exit raise using the same logic as a regular
-      // round (avgPercent against the active level's base).
-      const baseInfo = getSalaryBaseForLevel(lastReal.level, salaryBases);
-      if (baseInfo) {
-        const useBase = selectBaseForSalary(lastReal.newSalary, baseInfo);
-        const rawIncrease = useBase * (avgPercent / 100);
-        const actualIncrease = roundUp10(rawIncrease);
-        const cappedNewSalary = Math.min(
-          lastReal.newSalary + actualIncrease,
-          baseInfo.fullSalary,
-        );
-        markerOldSalary = lastReal.newSalary;
-        markerNewSalary = cappedNewSalary;
-        markerBase = useBase;
-        markerPercent = avgPercent;
-        markerIncrease = Math.round(rawIncrease * 100) / 100;
-        markerActualIncrease = actualIncrease;
-      }
-
-      // 1 day expressed in months (using average month length 30.4375).
-      const oneDayInMonths = 1 / 30.4375;
-      markerMonthsInWindow = oneDayInMonths;
-      // Steal 1 day's worth from the previous row so the total stays at 60.
-      lastReal.monthsInWindow = Math.max(
-        0,
-        lastReal.monthsInWindow - oneDayInMonths,
+    if (effectivePercent > 0 && markerBaseInfo) {
+      const useBase = selectBaseForSalary(markerOldSalary, markerBaseInfo);
+      const rawIncrease = useBase * (effectivePercent / 100);
+      const actualIncrease = roundUp10(rawIncrease);
+      const cappedNewSalary = Math.min(
+        markerOldSalary + actualIncrease,
+        markerBaseInfo.fullSalary,
       );
+      markerBase = useBase;
+      markerIncrease = Math.round(rawIncrease * 100) / 100;
+      markerActualIncrease = actualIncrease;
+      markerNewSalary = cappedNewSalary;
+
+      // Only fiscal-boundary exits get the 1-day-in-window credit (Thai rule).
+      // A non-fiscal exit with a user-overridden % is treated as an arbitrary
+      // out-of-band edit — applied to lastSalary but not added to the avg-60
+      // window.
+      if (isFiscalBoundaryExit) {
+        const oneDayInMonths = 1 / 30.4375;
+        markerMonthsInWindow = oneDayInMonths;
+        lastReal.monthsInWindow = Math.max(
+          0,
+          lastReal.monthsInWindow - oneDayInMonths,
+        );
+      }
     }
 
     if (!skipMarker) {
@@ -649,11 +683,11 @@ export function generateSalaryTable(
         periodLabel: `${markerDate.getDate().toString().padStart(2, "0")}/${(
           markerDate.getMonth() + 1
         ).toString().padStart(2, "0")}/${toBE(markerDate.getFullYear())}`,
-        level: lastReal.level,
+        level: markerLevel,
         oldSalary: markerOldSalary,
-        maxSalary: lastReal.maxSalary,
+        maxSalary: markerBaseInfo?.fullSalary ?? lastReal.maxSalary,
         base: markerBase,
-        percent: markerPercent,
+        percent: effectivePercent,
         increase: markerIncrease,
         actualIncrease: markerActualIncrease,
         newSalary: markerNewSalary,
