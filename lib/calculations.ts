@@ -43,6 +43,8 @@ export interface SalaryOverride {
   effectiveDate: string | null;
   level: string | null;
   percent: number | null;
+  /** Override row's oldSalary (pre-raise salary). null = computed default. */
+  oldSalary: number | null;
 }
 
 /**
@@ -301,52 +303,83 @@ export function generateSalaryTable(
   const windowEnd = new Date(endDate);
   windowEnd.setDate(windowEnd.getDate() - 1);
 
-  let salary = currentSalary;
-  let cursor = new Date(firstRound);
-  let periodCount = 0;
-  const safety = 200; // hard cap to prevent runaway loops
+  // Build the list of fiscal-round cursor dates from firstRound → anchorRound.
+  // We walk in two phases anchored at the assessment row: backward from the
+  // assessment row, then forward — so we need to know each row's index up
+  // front to attach the right override slot.
+  const rounds: Date[] = [];
+  {
+    const cursor = new Date(firstRound);
+    let safety = 0;
+    while (cursor.getTime() <= anchorRound.getTime() && safety < 200) {
+      rounds.push(new Date(cursor));
+      cursor.setMonth(cursor.getMonth() + 6);
+      safety++;
+    }
+  }
+  if (rounds.length === 0) return records;
 
-  while (cursor.getTime() <= anchorRound.getTime() && periodCount < safety) {
-    const override = overrides[periodCount];
+  // Find the assessment row's position. snappedAssessment is always a
+  // fiscal-boundary date and falls within [firstRound, anchorRound] in the
+  // common case. If snappedAssessment is past anchorRound (assessment after
+  // last fiscal round before exit), the only row IS at anchorRound — anchor
+  // the chain there with newSalary = currentSalary as a degenerate case.
+  let anchorIdx = rounds.findIndex(
+    (r) => r.getTime() === snappedAssessment.getTime(),
+  );
+  if (anchorIdx === -1) anchorIdx = rounds.length - 1;
 
-    // Per-row level override falls back to default
+  // Reverse-compute oldSalary given a known newSalary, percent, and level.
+  // Formula (forward): newSalary = oldSalary + roundUp10(useBase × %/100),
+  // where useBase = baseBottom if oldSalary ≤ baseMid else baseTop.
+  // Inverse: try both bracket assumptions and pick the one whose candidate
+  // oldSalary is consistent with the bracket it claims.
+  const reverseOldSalary = (
+    newSalary: number,
+    percent: number,
+    baseInfo: SalaryBaseInfo,
+  ): number => {
+    if (percent <= 0 || newSalary <= 0) return newSalary;
+    const incBottom = roundUp10(baseInfo.baseBottom * (percent / 100));
+    const candBottom = newSalary - incBottom;
+    if (candBottom > 0 && candBottom <= baseInfo.baseMid) return candBottom;
+    const incTop = roundUp10(baseInfo.baseTop * (percent / 100));
+    const candTop = newSalary - incTop;
+    return Math.max(0, candTop);
+  };
+
+  // Resolve per-row config (level, baseInfo, displayed date, percent, flags).
+  const getRowConfig = (idx: number, cursorDate: Date) => {
+    const override = overrides[idx];
     const rowLevel = override?.level ?? level;
     const rowBaseInfo =
       rowLevel === level
         ? defaultBaseInfo
         : (getSalaryBaseForLevel(rowLevel, salaryBases) ?? defaultBaseInfo);
 
-    // Per-row effective-date override jumps the cursor for this row only.
     // STALENESS GUARD: ignore overrides whose effectiveDate falls outside the
-    // current 60-month window. This handles the case where the user changed
-    // their exit date (window shifted) but old positional overrides from the
-    // previous window are still in salaryOverrides[]. Without this guard,
-    // the table would display stale dates that don't match the new window.
+    // current 60-month window — handles the case where the user changed exit
+    // date (window shifted) but old positional overrides remain.
     const rowDate = (() => {
-      if (!override?.effectiveDate) return cursor;
+      if (!override?.effectiveDate) return cursorDate;
       const od = new Date(override.effectiveDate);
-      if (isNaN(od.getTime())) return cursor;
+      if (isNaN(od.getTime())) return cursorDate;
       if (
         od.getTime() < windowStart.getTime() ||
         od.getTime() > windowEnd.getTime()
       ) {
-        return cursor;
+        return cursorDate;
       }
       return od;
     })();
 
-    // Round offset relative to snappedAssessment (in 6-month units):
+    // Round offset relative to snappedAssessment:
     //   0  = the assessment-date round (latest raise = "ปัจจุบัน")
-    //   −N = N rounds before assessment (historical, may have user-input %)
+    //   −N = N rounds before assessment (historical % from increases[N])
     //   +N = N rounds after assessment (future projection = "ประมาณ")
-    // increases[] is indexed from latest raise: increases[0] = at assessment,
-    // increases[1] = previous round, …, increases[5] = 5 rounds back. So the
-    // mapping from offset → increases index is `-offset` for offset ∈ [-5, 0].
-    // Older rows (offset < −5) silently fall back to avgPercent but are NOT
-    // badged "ประมาณ" — only future rows get that badge.
     const monthsDiff =
-      (cursor.getFullYear() - snappedAssessment.getFullYear()) * 12 +
-      (cursor.getMonth() - snappedAssessment.getMonth());
+      (cursorDate.getFullYear() - snappedAssessment.getFullYear()) * 12 +
+      (cursorDate.getMonth() - snappedAssessment.getMonth());
     const roundOffset = Math.round(monthsDiff / 6);
     const increasesIdx = -roundOffset;
     const computedPercent =
@@ -354,39 +387,121 @@ export function generateSalaryTable(
         ? increases[increasesIdx]
         : avgPercent;
     const percent = override?.percent ?? computedPercent;
-    const useBase = selectBaseForSalary(salary, rowBaseInfo);
-    const rawIncrease = useBase * (percent / 100);
-    const actualIncrease = roundUp10(rawIncrease);
-    const newSalary = salary + actualIncrease;
-    const cappedNewSalary =
-      newSalary > rowBaseInfo.fullSalary ? rowBaseInfo.fullSalary : newSalary;
 
-    const isCurrent = roundOffset === 0;
-    const isEstimated = roundOffset > 0;
-
-    records.push({
-      period: rowDate.toISOString(),
-      periodLabel: `${rowDate.getDate().toString().padStart(2, "0")}/${(
-        rowDate.getMonth() + 1
-      ).toString().padStart(2, "0")}/${toBE(rowDate.getFullYear())}`,
-      level: rowLevel,
-      oldSalary: salary,
-      maxSalary: rowBaseInfo.fullSalary,
-      base: useBase,
+    return {
+      override,
+      rowLevel,
+      rowBaseInfo,
+      rowDate,
       percent,
+      isCurrent: roundOffset === 0,
+      isEstimated: roundOffset > 0,
+    };
+  };
+
+  const formatLabel = (d: Date) =>
+    `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}/${toBE(d.getFullYear())}`;
+
+  const slots: (SalaryRecord | null)[] = new Array(rounds.length).fill(null);
+
+  // ANCHOR row: at index `anchorIdx`. newSalary = currentSalary (the user's
+  // reported salary AFTER the most recent raise). oldSalary is the pre-raise
+  // value — reverse-computed unless overridden.
+  {
+    const cfg = getRowConfig(anchorIdx, rounds[anchorIdx]);
+    const ovOld = cfg.override?.oldSalary;
+    const rowOld =
+      ovOld != null && Number.isFinite(ovOld)
+        ? ovOld
+        : reverseOldSalary(currentSalary, cfg.percent, cfg.rowBaseInfo);
+    const useBase = selectBaseForSalary(rowOld, cfg.rowBaseInfo);
+    const rawIncrease = useBase * (cfg.percent / 100);
+    const actualIncrease = Math.max(0, currentSalary - rowOld);
+    slots[anchorIdx] = {
+      period: cfg.rowDate.toISOString(),
+      periodLabel: formatLabel(cfg.rowDate),
+      level: cfg.rowLevel,
+      oldSalary: rowOld,
+      maxSalary: cfg.rowBaseInfo.fullSalary,
+      base: useBase,
+      percent: cfg.percent,
       increase: Math.round(rawIncrease * 100) / 100,
       actualIncrease,
-      newSalary: cappedNewSalary,
-      isEstimated,
-      isCurrent,
-      monthsInWindow: 0, // computed in post-pass below
-    });
-
-    salary = cappedNewSalary;
-    cursor = new Date(cursor);
-    cursor.setMonth(cursor.getMonth() + 6);
-    periodCount++;
+      newSalary: currentSalary,
+      isEstimated: cfg.isEstimated,
+      isCurrent: cfg.isCurrent,
+      monthsInWindow: 0,
+    };
   }
+
+  // BACKWARD walk: from anchorIdx-1 down to 0. Each row's newSalary equals
+  // the next (newer) row's oldSalary. Reverse-compute this row's oldSalary
+  // unless override.oldSalary is set.
+  let chainNewer = slots[anchorIdx]!.oldSalary;
+  for (let i = anchorIdx - 1; i >= 0; i--) {
+    const cfg = getRowConfig(i, rounds[i]);
+    const ovOld = cfg.override?.oldSalary;
+    const rowOld =
+      ovOld != null && Number.isFinite(ovOld)
+        ? ovOld
+        : reverseOldSalary(chainNewer, cfg.percent, cfg.rowBaseInfo);
+    const useBase = selectBaseForSalary(rowOld, cfg.rowBaseInfo);
+    const rawIncrease = useBase * (cfg.percent / 100);
+    const actualIncrease = Math.max(0, chainNewer - rowOld);
+    slots[i] = {
+      period: cfg.rowDate.toISOString(),
+      periodLabel: formatLabel(cfg.rowDate),
+      level: cfg.rowLevel,
+      oldSalary: rowOld,
+      maxSalary: cfg.rowBaseInfo.fullSalary,
+      base: useBase,
+      percent: cfg.percent,
+      increase: Math.round(rawIncrease * 100) / 100,
+      actualIncrease,
+      newSalary: chainNewer,
+      isEstimated: cfg.isEstimated,
+      isCurrent: cfg.isCurrent,
+      monthsInWindow: 0,
+    };
+    chainNewer = rowOld;
+  }
+
+  // FORWARD walk: from anchorIdx+1 to rounds.length-1. Each row's oldSalary
+  // is the previous (older) row's newSalary unless override.oldSalary is set.
+  let chainOlder = slots[anchorIdx]!.newSalary;
+  for (let i = anchorIdx + 1; i < rounds.length; i++) {
+    const cfg = getRowConfig(i, rounds[i]);
+    const ovOld = cfg.override?.oldSalary;
+    const rowOld =
+      ovOld != null && Number.isFinite(ovOld) ? ovOld : chainOlder;
+    const useBase = selectBaseForSalary(rowOld, cfg.rowBaseInfo);
+    const rawIncrease = useBase * (cfg.percent / 100);
+    const actualIncrease = roundUp10(rawIncrease);
+    const cappedNew = Math.min(
+      rowOld + actualIncrease,
+      cfg.rowBaseInfo.fullSalary,
+    );
+    slots[i] = {
+      period: cfg.rowDate.toISOString(),
+      periodLabel: formatLabel(cfg.rowDate),
+      level: cfg.rowLevel,
+      oldSalary: rowOld,
+      maxSalary: cfg.rowBaseInfo.fullSalary,
+      base: useBase,
+      percent: cfg.percent,
+      increase: Math.round(rawIncrease * 100) / 100,
+      actualIncrease,
+      newSalary: cappedNew,
+      isEstimated: cfg.isEstimated,
+      isCurrent: cfg.isCurrent,
+      monthsInWindow: 0,
+    };
+    chainOlder = cappedNew;
+  }
+
+  for (const r of slots) if (r) records.push(r);
 
   // Post-pass: compute monthsInWindow per row based on overlap with the
   // 60-month averaging window [windowStart, windowEnd] (computed at the

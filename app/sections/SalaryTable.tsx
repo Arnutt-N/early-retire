@@ -46,7 +46,12 @@ export default function SalaryTableSection({
   const updateOverride = (idx: number, partial: Partial<SalaryOverride>) => {
     const overrides = [...form.salaryOverrides];
     while (overrides.length <= idx) {
-      overrides.push({ effectiveDate: null, level: null, percent: null });
+      overrides.push({
+        effectiveDate: null,
+        level: null,
+        percent: null,
+        oldSalary: null,
+      });
     }
     overrides[idx] = { ...overrides[idx], ...partial };
     updateForm({ salaryOverrides: overrides });
@@ -55,7 +60,12 @@ export default function SalaryTableSection({
   const clearOverride = (idx: number) => {
     const overrides = [...form.salaryOverrides];
     if (idx >= overrides.length) return;
-    overrides[idx] = { effectiveDate: null, level: null, percent: null };
+    overrides[idx] = {
+      effectiveDate: null,
+      level: null,
+      percent: null,
+      oldSalary: null,
+    };
     updateForm({ salaryOverrides: overrides });
     if (editingIdx === idx) setEditingIdx(null);
   };
@@ -567,8 +577,29 @@ export default function SalaryTableSection({
                         </td>
 
                         {/* เงินเดือนเดิม */}
-                        <td className="px-3 py-2.5 align-middle text-right tabular-nums">
-                          {formatNumber(r.oldSalary)}
+                        <td className="px-3 py-2.5 align-middle text-right tabular-nums min-w-[110px]">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              pattern="[0-9]*[.]?[0-9]*"
+                              value={override?.oldSalary ?? r.oldSalary}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => {
+                                const cleaned = e.target.value
+                                  .replace(/[^\d.]/g, "")
+                                  .replace(/(\..*?)\..*/, "$1");
+                                const v = parseFloat(cleaned);
+                                updateOverride(i, {
+                                  oldSalary: isNaN(v) ? null : v,
+                                });
+                              }}
+                              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-right text-xs font-medium focus:outline-none focus:border-violet-500"
+                              title="แก้ไขเงินเดือนเดิม (ก่อนเลื่อน) ของแถวนี้"
+                            />
+                          ) : (
+                            formatNumber(r.oldSalary)
+                          )}
                         </td>
 
                         {/* ขั้นสูง */}
@@ -747,7 +778,8 @@ export default function SalaryTableSection({
               const hasOverride =
                 !!override?.level ||
                 !!override?.effectiveDate ||
-                override?.percent !== null;
+                override?.percent !== null ||
+                override?.oldSalary !== null;
               const isEditing = editingIdx === i;
               const isExpanded = expandedIdx === i || isEditing;
               const displayDate = override?.effectiveDate ?? r.period;
@@ -851,6 +883,29 @@ export default function SalaryTableSection({
                                     </option>
                                   ))}
                                 </select>
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                                  เงินเดือนเดิม
+                                  <span className="ml-1 text-gray-400">(ก่อนเลื่อน)</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  pattern="[0-9]*[.]?[0-9]*"
+                                  value={override?.oldSalary ?? r.oldSalary}
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(e) => {
+                                    const cleaned = e.target.value
+                                      .replace(/[^\d.]/g, "")
+                                      .replace(/(\..*?)\..*/, "$1");
+                                    const v = parseFloat(cleaned);
+                                    updateOverride(i, {
+                                      oldSalary: isNaN(v) ? null : v,
+                                    });
+                                  }}
+                                  className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-right text-xs font-medium focus:outline-none focus:border-violet-500"
+                                />
                               </div>
                               <div>
                                 <label className="block text-[11px] font-medium text-gray-500 mb-1">

@@ -21,6 +21,12 @@ export interface SalaryOverride {
   level: string | null;
   /** Override % increase for this row (used for future/estimated rounds), or null to use computed default */
   percent: number | null;
+  /**
+   * Override "เงินเดือนเดิม" (the salary BEFORE the raise on this row's date),
+   * or null to use computed default. When set, breaks the chain — the row's
+   * oldSalary is pinned and older rows pivot from this value.
+   */
+  oldSalary: number | null;
 }
 
 export interface PensionResult {
@@ -106,5 +112,5 @@ export interface FormState {
 
 export type RetirementOption = FormState["retirementOption"];
 
-/** Current schema version for FormState. Bump when shape changes incompatibly. Phase 1 sets this to 2 (v1 = pre-redesign). */
-export const FORM_STATE_SCHEMA_VERSION = 2;
+/** Current schema version for FormState. Bump when shape changes incompatibly. v3 adds SalaryOverride.oldSalary. */
+export const FORM_STATE_SCHEMA_VERSION = 3;
