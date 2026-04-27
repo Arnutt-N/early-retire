@@ -143,7 +143,7 @@ export default function SalaryHistoryForm({ form, updateForm, onNext, onBack }: 
               <span className="text-sm text-emerald-800">ค่าเฉลี่ยการเลื่อนเงินเดือน</span>
             </div>
             <span className="text-xl font-bold text-emerald-600">
-              {avgPercent.toFixed(2)}%
+              {avgPercent.toFixed(1)}%
             </span>
           </div>
           <p className="text-xs text-emerald-600 mt-2">

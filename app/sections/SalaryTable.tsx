@@ -42,6 +42,26 @@ export default function SalaryTableSection({
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   // Mobile only: which compact row has its details expanded.
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  // Raw string drafts for the actively editing row's numeric inputs.
+  // Required because controlled <input value={number}> round-trips through
+  // parseFloat and strips intermediate states like "3." (trailing dot) or ""
+  // (cleared field), which makes typing decimals impossible.
+  const [percentDraft, setPercentDraft] = useState<string>("");
+  const [oldSalaryDraft, setOldSalaryDraft] = useState<string>("");
+
+  const startEdit = (idx: number) => {
+    const r = records[idx];
+    const ov = form.salaryOverrides[idx];
+    setPercentDraft(String(ov?.percent ?? r?.percent ?? ""));
+    setOldSalaryDraft(String(ov?.oldSalary ?? r?.oldSalary ?? ""));
+    setEditingIdx(idx);
+  };
+
+  const stopEdit = () => {
+    setPercentDraft("");
+    setOldSalaryDraft("");
+    setEditingIdx(null);
+  };
 
   const updateOverride = (idx: number, partial: Partial<SalaryOverride>) => {
     const overrides = [...form.salaryOverrides];
@@ -67,7 +87,7 @@ export default function SalaryTableSection({
       oldSalary: null,
     };
     updateForm({ salaryOverrides: overrides });
-    if (editingIdx === idx) setEditingIdx(null);
+    if (editingIdx === idx) stopEdit();
   };
 
   const isGfp = form.mode === "gfp";
@@ -583,12 +603,13 @@ export default function SalaryTableSection({
                               type="text"
                               inputMode="decimal"
                               pattern="[0-9]*[.]?[0-9]*"
-                              value={override?.oldSalary ?? r.oldSalary}
+                              value={oldSalaryDraft}
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => {
                                 const cleaned = e.target.value
                                   .replace(/[^\d.]/g, "")
                                   .replace(/(\..*?)\..*/, "$1");
+                                setOldSalaryDraft(cleaned);
                                 const v = parseFloat(cleaned);
                                 updateOverride(i, {
                                   oldSalary: isNaN(v) ? null : v,
@@ -619,13 +640,13 @@ export default function SalaryTableSection({
                               type="text"
                               inputMode="decimal"
                               pattern="[0-9]*[.]?[0-9]*"
-                              value={displayPercent}
+                              value={percentDraft}
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => {
-                                const raw = e.target.value;
-                                const cleaned = raw
+                                const cleaned = e.target.value
                                   .replace(/[^\d.]/g, "")
                                   .replace(/(\..*?)\..*/, "$1");
+                                setPercentDraft(cleaned);
                                 const v = parseFloat(cleaned);
                                 updateOverride(i, {
                                   percent: isNaN(v) ? null : v,
@@ -633,12 +654,12 @@ export default function SalaryTableSection({
                               }}
                               className={cn(
                                 "w-full px-2 py-1.5 rounded-lg border bg-white text-right text-xs font-medium focus:outline-none",
-                                Number(displayPercent) > 6
+                                Number(percentDraft) > 6
                                   ? "border-red-300 focus:border-red-500"
                                   : "border-gray-200 focus:border-violet-500",
                               )}
                               title={
-                                Number(displayPercent) > 6
+                                Number(percentDraft) > 6
                                   ? "เกิน 6% — โปรดตรวจสอบ"
                                   : undefined
                               }
@@ -678,7 +699,7 @@ export default function SalaryTableSection({
                             {isEditing ? (
                               <button
                                 type="button"
-                                onClick={() => setEditingIdx(null)}
+                                onClick={() => stopEdit()}
                                 aria-label={`บันทึกการแก้ไขแถว ${i + 1}`}
                                 className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
                                 title="เสร็จสิ้น"
@@ -688,7 +709,7 @@ export default function SalaryTableSection({
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => setEditingIdx(i)}
+                                onClick={() => startEdit(i)}
                                 aria-label={`แก้ไขแถว ${i + 1}`}
                                 className="p-1.5 rounded-md text-violet-600 hover:bg-violet-50 transition-colors cursor-pointer"
                                 title="แก้ไขแถวนี้"
@@ -893,12 +914,13 @@ export default function SalaryTableSection({
                                   type="text"
                                   inputMode="decimal"
                                   pattern="[0-9]*[.]?[0-9]*"
-                                  value={override?.oldSalary ?? r.oldSalary}
+                                  value={oldSalaryDraft}
                                   onFocus={(e) => e.target.select()}
                                   onChange={(e) => {
                                     const cleaned = e.target.value
                                       .replace(/[^\d.]/g, "")
                                       .replace(/(\..*?)\..*/, "$1");
+                                    setOldSalaryDraft(cleaned);
                                     const v = parseFloat(cleaned);
                                     updateOverride(i, {
                                       oldSalary: isNaN(v) ? null : v,
@@ -916,13 +938,13 @@ export default function SalaryTableSection({
                                   type="text"
                                   inputMode="decimal"
                                   pattern="[0-9]*[.]?[0-9]*"
-                                  value={displayPercent}
+                                  value={percentDraft}
                                   onFocus={(e) => e.target.select()}
                                   onChange={(e) => {
-                                    const raw = e.target.value;
-                                    const cleaned = raw
+                                    const cleaned = e.target.value
                                       .replace(/[^\d.]/g, "")
                                       .replace(/(\..*?)\..*/, "$1");
+                                    setPercentDraft(cleaned);
                                     const v = parseFloat(cleaned);
                                     updateOverride(i, {
                                       percent: isNaN(v) ? null : v,
@@ -930,12 +952,12 @@ export default function SalaryTableSection({
                                   }}
                                   className={cn(
                                     "w-full px-3 py-2 rounded-lg border bg-white text-right text-xs font-medium focus:outline-none",
-                                    Number(displayPercent) > 6
+                                    Number(percentDraft) > 6
                                       ? "border-red-300 focus:border-red-500"
                                       : "border-gray-200 focus:border-violet-500",
                                   )}
                                 />
-                                {Number(displayPercent) > 6 && (
+                                {Number(percentDraft) > 6 && (
                                   <p className="mt-1 text-[10px] text-red-500">
                                     เกิน 6% — โปรดตรวจสอบ
                                   </p>
@@ -972,7 +994,7 @@ export default function SalaryTableSection({
                             {isEditing ? (
                               <button
                                 type="button"
-                                onClick={() => setEditingIdx(null)}
+                                onClick={() => stopEdit()}
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
                               >
                                 <Check size={14} />
@@ -981,7 +1003,7 @@ export default function SalaryTableSection({
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => setEditingIdx(i)}
+                                onClick={() => startEdit(i)}
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors cursor-pointer"
                               >
                                 <Pencil size={12} />
