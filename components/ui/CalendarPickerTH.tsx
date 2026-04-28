@@ -314,7 +314,7 @@ export default function CalendarPickerTH({
       
       {/* Input Container */}
       <div className={cn(
-        "relative flex items-center gap-1 pl-1 pr-2 py-1 rounded-xl border-2 bg-white transition-all duration-200",
+        "relative flex items-center gap-1 pl-1 pr-4 py-1 rounded-xl border-2 bg-white transition-all duration-200",
         error || localError
           ? "border-red-300 focus-within:border-red-500"
           : "border-gray-200 hover:border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100"
