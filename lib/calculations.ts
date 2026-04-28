@@ -45,6 +45,8 @@ export interface SalaryOverride {
   percent: number | null;
   /** Override row's oldSalary (pre-raise salary). null = computed default. */
   oldSalary: number | null;
+  /** Override row's newSalary (post-raise salary). null = computed default. */
+  newSalary: number | null;
 }
 
 /**
@@ -439,13 +441,20 @@ export function generateSalaryTable(
   {
     const cfg = getRowConfig(anchorIdx, rounds[anchorIdx]);
     const ovOld = cfg.override?.oldSalary;
+    const ovNew = cfg.override?.newSalary;
+    // Anchor row's newSalary is currentSalary by default; override.newSalary
+    // wins (capped at fullSalary so it never displays a sub-cap raise).
+    const rowNew =
+      ovNew != null && Number.isFinite(ovNew)
+        ? Math.min(ovNew, cfg.rowBaseInfo.fullSalary)
+        : currentSalary;
     const rowOld =
       ovOld != null && Number.isFinite(ovOld)
         ? ovOld
-        : reverseOldSalary(currentSalary, cfg.percent, cfg.rowBaseInfo);
+        : reverseOldSalary(rowNew, cfg.percent, cfg.rowBaseInfo);
     const useBase = selectBaseForSalary(rowOld, cfg.rowBaseInfo);
     const rawIncrease = useBase * (cfg.percent / 100);
-    const actualIncrease = Math.max(0, currentSalary - rowOld);
+    const actualIncrease = Math.max(0, rowNew - rowOld);
     slots[anchorIdx] = {
       period: cfg.rowDate.toISOString(),
       periodLabel: formatLabel(cfg.rowDate),
@@ -456,7 +465,7 @@ export function generateSalaryTable(
       percent: cfg.percent,
       increase: Math.round(rawIncrease * 100) / 100,
       actualIncrease,
-      newSalary: currentSalary,
+      newSalary: rowNew,
       isEstimated: cfg.isEstimated,
       isCurrent: cfg.isCurrent,
       monthsInWindow: 0,
@@ -464,19 +473,25 @@ export function generateSalaryTable(
   }
 
   // BACKWARD walk: from anchorIdx-1 down to 0. Each row's newSalary equals
-  // the next (newer) row's oldSalary. Reverse-compute this row's oldSalary
-  // unless override.oldSalary is set.
+  // the next (newer) row's oldSalary by default. Override.newSalary breaks
+  // the chain on this row only — row's newSalary becomes the override but
+  // older rows still pivot from this row's oldSalary.
   let chainNewer = slots[anchorIdx]!.oldSalary;
   for (let i = anchorIdx - 1; i >= 0; i--) {
     const cfg = getRowConfig(i, rounds[i]);
     const ovOld = cfg.override?.oldSalary;
+    const ovNew = cfg.override?.newSalary;
+    const rowNew =
+      ovNew != null && Number.isFinite(ovNew)
+        ? Math.min(ovNew, cfg.rowBaseInfo.fullSalary)
+        : chainNewer;
     const rowOld =
       ovOld != null && Number.isFinite(ovOld)
         ? ovOld
-        : reverseOldSalary(chainNewer, cfg.percent, cfg.rowBaseInfo);
+        : reverseOldSalary(rowNew, cfg.percent, cfg.rowBaseInfo);
     const useBase = selectBaseForSalary(rowOld, cfg.rowBaseInfo);
     const rawIncrease = useBase * (cfg.percent / 100);
-    const actualIncrease = Math.max(0, chainNewer - rowOld);
+    const actualIncrease = Math.max(0, rowNew - rowOld);
     slots[i] = {
       period: cfg.rowDate.toISOString(),
       periodLabel: formatLabel(cfg.rowDate),
@@ -487,7 +502,7 @@ export function generateSalaryTable(
       percent: cfg.percent,
       increase: Math.round(rawIncrease * 100) / 100,
       actualIncrease,
-      newSalary: chainNewer,
+      newSalary: rowNew,
       isEstimated: cfg.isEstimated,
       isCurrent: cfg.isCurrent,
       monthsInWindow: 0,
@@ -497,19 +512,30 @@ export function generateSalaryTable(
 
   // FORWARD walk: from anchorIdx+1 to rounds.length-1. Each row's oldSalary
   // is the previous (older) row's newSalary unless override.oldSalary is set.
+  // Override.newSalary pins the row's newSalary directly (capped at full).
+  // actualIncrease ALWAYS reflects the real change after cap — so when a
+  // raise pushes the salary past fullSalary, actualIncrease shows the
+  // partial bump (not the uncapped raw amount), and subsequent rows at
+  // fullSalary show actualIncrease = 0.
   let chainOlder = slots[anchorIdx]!.newSalary;
   for (let i = anchorIdx + 1; i < rounds.length; i++) {
     const cfg = getRowConfig(i, rounds[i]);
     const ovOld = cfg.override?.oldSalary;
+    const ovNew = cfg.override?.newSalary;
     const rowOld =
       ovOld != null && Number.isFinite(ovOld) ? ovOld : chainOlder;
     const useBase = selectBaseForSalary(rowOld, cfg.rowBaseInfo);
     const rawIncrease = useBase * (cfg.percent / 100);
-    const actualIncrease = roundUp10(rawIncrease);
-    const cappedNew = Math.min(
-      rowOld + actualIncrease,
+    const proposedIncrease = roundUp10(rawIncrease);
+    const computedNew = Math.min(
+      rowOld + proposedIncrease,
       cfg.rowBaseInfo.fullSalary,
     );
+    const cappedNew =
+      ovNew != null && Number.isFinite(ovNew)
+        ? Math.min(ovNew, cfg.rowBaseInfo.fullSalary)
+        : computedNew;
+    const actualIncrease = Math.max(0, cappedNew - rowOld);
     slots[i] = {
       period: cfg.rowDate.toISOString(),
       periodLabel: formatLabel(cfg.rowDate),
@@ -644,30 +670,51 @@ export function generateSalaryTable(
       ? overrideOldSalary
       : lastReal.newSalary;
 
+    // newSalary: override.newSalary pins the post-raise value (capped at
+    // fullSalary); else compute from oldSalary + (effectivePercent raise).
+    const overrideNewSalary = markerOverride?.newSalary;
+    const hasNewOverride =
+      overrideNewSalary != null && Number.isFinite(overrideNewSalary);
+
     let markerNewSalary = markerOldSalary;
     let markerBase = 0;
     let markerIncrease = 0;
     let markerActualIncrease = 0;
     let markerMonthsInWindow = 0;
 
-    if (effectivePercent > 0 && markerBaseInfo) {
-      const useBase = selectBaseForSalary(markerOldSalary, markerBaseInfo);
-      const rawIncrease = useBase * (effectivePercent / 100);
-      const actualIncrease = roundUp10(rawIncrease);
-      const cappedNewSalary = Math.min(
-        markerOldSalary + actualIncrease,
-        markerBaseInfo.fullSalary,
-      );
-      markerBase = useBase;
-      markerIncrease = Math.round(rawIncrease * 100) / 100;
-      markerActualIncrease = actualIncrease;
-      markerNewSalary = cappedNewSalary;
+    if (markerBaseInfo) {
+      if (hasNewOverride) {
+        const cappedNewSalary = Math.min(
+          overrideNewSalary,
+          markerBaseInfo.fullSalary,
+        );
+        markerNewSalary = cappedNewSalary;
+        markerActualIncrease = Math.max(0, cappedNewSalary - markerOldSalary);
+        markerBase = selectBaseForSalary(markerOldSalary, markerBaseInfo);
+        markerIncrease = markerActualIncrease;
+      } else if (effectivePercent > 0) {
+        const useBase = selectBaseForSalary(markerOldSalary, markerBaseInfo);
+        const rawIncrease = useBase * (effectivePercent / 100);
+        const proposedIncrease = roundUp10(rawIncrease);
+        const cappedNewSalary = Math.min(
+          markerOldSalary + proposedIncrease,
+          markerBaseInfo.fullSalary,
+        );
+        markerBase = useBase;
+        markerIncrease = Math.round(rawIncrease * 100) / 100;
+        // actualIncrease reflects the real change (cap-aware).
+        markerActualIncrease = Math.max(0, cappedNewSalary - markerOldSalary);
+        markerNewSalary = cappedNewSalary;
+      }
 
       // Only fiscal-boundary exits get the 1-day-in-window credit (Thai rule).
-      // A non-fiscal exit with a user-overridden % is treated as an arbitrary
-      // out-of-band edit — applied to lastSalary but not added to the avg-60
-      // window.
-      if (isFiscalBoundaryExit) {
+      // A non-fiscal exit with a user-overridden % or newSalary applies to
+      // lastSalary but is NOT added to the avg-60 window.
+      if (
+        isFiscalBoundaryExit &&
+        markerActualIncrease > 0 &&
+        !hasNewOverride
+      ) {
         const oneDayInMonths = 1 / 30.4375;
         markerMonthsInWindow = oneDayInMonths;
         lastReal.monthsInWindow = Math.max(

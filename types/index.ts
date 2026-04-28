@@ -27,6 +27,12 @@ export interface SalaryOverride {
    * oldSalary is pinned and older rows pivot from this value.
    */
   oldSalary: number | null;
+  /**
+   * Override "เงินเดือนใหม่" (the salary AFTER the raise on this row's date),
+   * or null to use computed default. When set, breaks the chain — the row's
+   * newSalary is pinned. actualIncrease is recomputed as newSalary − oldSalary.
+   */
+  newSalary: number | null;
 }
 
 export interface PensionResult {

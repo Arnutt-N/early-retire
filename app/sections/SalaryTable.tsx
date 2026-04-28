@@ -48,18 +48,21 @@ export default function SalaryTableSection({
   // (cleared field), which makes typing decimals impossible.
   const [percentDraft, setPercentDraft] = useState<string>("");
   const [oldSalaryDraft, setOldSalaryDraft] = useState<string>("");
+  const [newSalaryDraft, setNewSalaryDraft] = useState<string>("");
 
   const startEdit = (idx: number) => {
     const r = records[idx];
     const ov = form.salaryOverrides[idx];
     setPercentDraft(String(ov?.percent ?? r?.percent ?? ""));
     setOldSalaryDraft(String(ov?.oldSalary ?? r?.oldSalary ?? ""));
+    setNewSalaryDraft(String(ov?.newSalary ?? r?.newSalary ?? ""));
     setEditingIdx(idx);
   };
 
   const stopEdit = () => {
     setPercentDraft("");
     setOldSalaryDraft("");
+    setNewSalaryDraft("");
     setEditingIdx(null);
   };
 
@@ -71,6 +74,7 @@ export default function SalaryTableSection({
         level: null,
         percent: null,
         oldSalary: null,
+        newSalary: null,
       });
     }
     overrides[idx] = { ...overrides[idx], ...partial };
@@ -85,6 +89,7 @@ export default function SalaryTableSection({
       level: null,
       percent: null,
       oldSalary: null,
+      newSalary: null,
     };
     updateForm({ salaryOverrides: overrides });
     if (editingIdx === idx) stopEdit();
@@ -439,7 +444,8 @@ export default function SalaryTableSection({
                       const markerHasOverride =
                         !!markerOverride?.level ||
                         markerOverride?.percent !== null ||
-                        markerOverride?.oldSalary !== null;
+                        markerOverride?.oldSalary !== null ||
+                        markerOverride?.newSalary !== null;
                       const markerEditing = editingIdx === i;
                       const markerDisplayLevel = markerOverride?.level ?? r.level;
 
@@ -588,11 +594,33 @@ export default function SalaryTableSection({
                           </td>
                           <td
                             className={cn(
-                              "px-3 py-2.5 align-middle text-right tabular-nums font-bold",
+                              "px-3 py-2.5 align-middle text-right tabular-nums font-bold min-w-[110px]",
                               isGfp ? "text-gray-700" : "text-indigo-700",
                             )}
                           >
-                            {formatNumber(r.newSalary)}
+                            {markerEditing ? (
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                pattern="[0-9]*[.]?[0-9]*"
+                                value={newSalaryDraft}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const cleaned = e.target.value
+                                    .replace(/[^\d.]/g, "")
+                                    .replace(/(\..*?)\..*/, "$1");
+                                  setNewSalaryDraft(cleaned);
+                                  const v = parseFloat(cleaned);
+                                  updateOverride(i, {
+                                    newSalary: isNaN(v) ? null : v,
+                                  });
+                                }}
+                                className="w-full px-2 py-1.5 rounded-lg border border-violet-200 bg-white text-right text-xs font-bold focus:outline-none focus:border-violet-500"
+                                title="แก้ไขเงินเดือนสุดท้าย (หลังเลื่อน) — ใช้ในสูตรบำเหน็จ × อายุราชการ"
+                              />
+                            ) : (
+                              formatNumber(r.newSalary)
+                            )}
                           </td>
                           <td className="px-3 py-2.5 align-middle text-center">
                             <div className="flex items-center justify-center gap-1">
@@ -641,7 +669,9 @@ export default function SalaryTableSection({
                     const hasOverride =
                       !!override?.level ||
                       !!override?.effectiveDate ||
-                      override?.percent !== null;
+                      override?.percent !== null ||
+                      override?.oldSalary !== null ||
+                      override?.newSalary !== null;
                     const isEditing = editingIdx === i;
                     const displayDate = override?.effectiveDate ?? r.period;
                     const displayLevel = override?.level ?? r.level;
@@ -808,8 +838,30 @@ export default function SalaryTableSection({
                         </td>
 
                         {/* เงินเดือนใหม่ */}
-                        <td className="px-3 py-2.5 align-middle text-right tabular-nums font-bold text-violet-700">
-                          {formatNumber(r.newSalary)}
+                        <td className="px-3 py-2.5 align-middle text-right tabular-nums font-bold text-violet-700 min-w-[110px]">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              pattern="[0-9]*[.]?[0-9]*"
+                              value={newSalaryDraft}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => {
+                                const cleaned = e.target.value
+                                  .replace(/[^\d.]/g, "")
+                                  .replace(/(\..*?)\..*/, "$1");
+                                setNewSalaryDraft(cleaned);
+                                const v = parseFloat(cleaned);
+                                updateOverride(i, {
+                                  newSalary: isNaN(v) ? null : v,
+                                });
+                              }}
+                              className="w-full px-2 py-1.5 rounded-lg border border-violet-200 bg-white text-right text-xs font-bold text-violet-700 focus:outline-none focus:border-violet-500"
+                              title="แก้ไขเงินเดือนใหม่ (หลังเลื่อน) ของแถวนี้ — คำนวณเลื่อนจริง = ใหม่ − เดิม"
+                            />
+                          ) : (
+                            formatNumber(r.newSalary)
+                          )}
                         </td>
 
                         {/* จัดการ */}
@@ -871,7 +923,8 @@ export default function SalaryTableSection({
                 const markerHasOverride =
                   !!markerOverride?.level ||
                   markerOverride?.percent !== null ||
-                  markerOverride?.oldSalary !== null;
+                  markerOverride?.oldSalary !== null ||
+                  markerOverride?.newSalary !== null;
                 const markerEditing = editingIdx === i;
                 const markerDisplayLevel = markerOverride?.level ?? r.level;
 
@@ -1003,6 +1056,32 @@ export default function SalaryTableSection({
                             </p>
                           )}
                         </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                            เงินเดือนใหม่
+                            <span className="ml-1 text-gray-400">
+                              (หลังเลื่อน)
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            pattern="[0-9]*[.]?[0-9]*"
+                            value={newSalaryDraft}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const cleaned = e.target.value
+                                .replace(/[^\d.]/g, "")
+                                .replace(/(\..*?)\..*/, "$1");
+                              setNewSalaryDraft(cleaned);
+                              const v = parseFloat(cleaned);
+                              updateOverride(i, {
+                                newSalary: isNaN(v) ? null : v,
+                              });
+                            }}
+                            className="w-full px-3 py-2 rounded-lg border border-violet-200 bg-white text-right text-xs font-bold text-violet-700 focus:outline-none focus:border-violet-500"
+                          />
+                        </div>
                       </div>
                     )}
 
@@ -1045,7 +1124,8 @@ export default function SalaryTableSection({
                 !!override?.level ||
                 !!override?.effectiveDate ||
                 override?.percent !== null ||
-                override?.oldSalary !== null;
+                override?.oldSalary !== null ||
+                override?.newSalary !== null;
               const isEditing = editingIdx === i;
               const isExpanded = expandedIdx === i || isEditing;
               const displayDate = override?.effectiveDate ?? r.period;
@@ -1207,6 +1287,32 @@ export default function SalaryTableSection({
                                     เกิน 6% — โปรดตรวจสอบ
                                   </p>
                                 )}
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                                  เงินเดือนใหม่
+                                  <span className="ml-1 text-gray-400">
+                                    (หลังเลื่อน)
+                                  </span>
+                                </label>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  pattern="[0-9]*[.]?[0-9]*"
+                                  value={newSalaryDraft}
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(e) => {
+                                    const cleaned = e.target.value
+                                      .replace(/[^\d.]/g, "")
+                                      .replace(/(\..*?)\..*/, "$1");
+                                    setNewSalaryDraft(cleaned);
+                                    const v = parseFloat(cleaned);
+                                    updateOverride(i, {
+                                      newSalary: isNaN(v) ? null : v,
+                                    });
+                                  }}
+                                  className="w-full px-3 py-2 rounded-lg border border-violet-200 bg-white text-right text-xs font-bold text-violet-700 focus:outline-none focus:border-violet-500"
+                                />
                               </div>
                             </div>
                           ) : (
