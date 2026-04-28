@@ -277,17 +277,23 @@ export default function SalaryTableSection({
         <p className="text-xs text-violet-600 mb-4">
           ใช้เป็นค่าเริ่มต้นของทุกแถว — สามารถแก้ไขรายแถวด้านล่างได้หากตำแหน่งเปลี่ยน
         </p>
-        <select
-          value={form.defaultLevel}
-          onChange={(e) => updateForm({ defaultLevel: e.target.value })}
-          className="block w-full px-4 py-3 min-h-[48px] rounded-xl border-2 border-violet-200 bg-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-200 font-medium text-gray-900 cursor-pointer"
-        >
-          {LEVEL_DISPLAY_ORDER.map((l) => (
-            <option key={l.value} value={l.value}>
-              {l.label}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            value={form.defaultLevel}
+            onChange={(e) => updateForm({ defaultLevel: e.target.value })}
+            className="appearance-none block w-full pl-4 pr-12 py-3 min-h-[48px] rounded-xl border-2 border-violet-200 bg-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-200 font-medium text-gray-900 cursor-pointer"
+          >
+            {LEVEL_DISPLAY_ORDER.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={20}
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-violet-500"
+          />
+        </div>
       </div>
 
       {/* 60-month calculation window — GFP only. Shows the exact months feeding
