@@ -198,12 +198,16 @@ export default function CalendarPickerTH({
       yearRef.current.select();
     }
 
-    // Commit immediately when all 3 fields look complete (year reaches 4 digits last)
-    const dayLen = dayRef.current?.value.length ?? 0;
-    const monthLen = monthRef.current?.value.length ?? 0;
-    const yearLen = yearRef.current?.value.length ?? 0;
-    if (dayLen >= 1 && monthLen >= 1 && yearLen === 4) {
-      queueMicrotask(() => validateAndUpdate());
+    // Commit immediately only when user just completed the year field (year is the
+    // last field in tab order). Triggering on month/day edits would let the post-
+    // commit useEffect rewrite the input back to its zero-padded form mid-keystroke,
+    // blocking entry of two-digit months like "10".
+    if (type === 'year' && clean.length === 4) {
+      const dayLen = dayRef.current?.value.length ?? 0;
+      const monthLen = monthRef.current?.value.length ?? 0;
+      if (dayLen >= 1 && monthLen >= 1) {
+        queueMicrotask(() => validateAndUpdate());
+      }
     }
   };
 
