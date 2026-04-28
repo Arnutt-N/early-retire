@@ -435,95 +435,44 @@ export function generateSalaryTable(
 
   const slots: (SalaryRecord | null)[] = new Array(rounds.length).fill(null);
 
-  // ANCHOR row: at index `anchorIdx`. newSalary = currentSalary (the user's
-  // reported salary AFTER the most recent raise). oldSalary is the pre-raise
-  // value — reverse-computed unless overridden.
+  // Compute the DEFAULT oldSalary for the OLDEST row by reversing back from
+  // currentSalary through every row's percent. This is only the seed used
+  // when row 0 has no override.oldSalary — once user pins ANY field, the
+  // forward walk below recomputes everything from that pivot onward, even
+  // overriding the anchor row's newSalary if necessary.
+  //
+  // (Cascade rule the user expects: editing any old row's oldSalary or %
+  // propagates forward to all newer rows. The anchor's currentSalary acts as
+  // a default seed only — the user's explicit edits take precedence.)
+  let seedFirstOldSalary: number;
   {
-    const cfg = getRowConfig(anchorIdx, rounds[anchorIdx]);
-    const ovOld = cfg.override?.oldSalary;
-    const ovNew = cfg.override?.newSalary;
-    // Anchor row's newSalary is currentSalary by default; override.newSalary
-    // wins (capped at fullSalary so it never displays a sub-cap raise).
-    const rowNew =
-      ovNew != null && Number.isFinite(ovNew)
-        ? Math.min(ovNew, cfg.rowBaseInfo.fullSalary)
-        : currentSalary;
-    const rowOld =
-      ovOld != null && Number.isFinite(ovOld)
-        ? ovOld
-        : reverseOldSalary(rowNew, cfg.percent, cfg.rowBaseInfo);
-    const useBase = selectBaseForSalary(rowOld, cfg.rowBaseInfo);
-    const rawIncrease = useBase * (cfg.percent / 100);
-    const actualIncrease = Math.max(0, rowNew - rowOld);
-    slots[anchorIdx] = {
-      period: cfg.rowDate.toISOString(),
-      periodLabel: formatLabel(cfg.rowDate),
-      level: cfg.rowLevel,
-      oldSalary: rowOld,
-      maxSalary: cfg.rowBaseInfo.fullSalary,
-      base: useBase,
-      percent: cfg.percent,
-      increase: Math.round(rawIncrease * 100) / 100,
-      actualIncrease,
-      newSalary: rowNew,
-      isEstimated: cfg.isEstimated,
-      isCurrent: cfg.isCurrent,
-      monthsInWindow: 0,
-    };
+    let salary = currentSalary;
+    for (let i = anchorIdx; i >= 1; i--) {
+      const cfg = getRowConfig(i, rounds[i]);
+      salary = reverseOldSalary(salary, cfg.percent, cfg.rowBaseInfo);
+    }
+    seedFirstOldSalary = salary;
   }
 
-  // BACKWARD walk: from anchorIdx-1 down to 0. Each row's newSalary equals
-  // the next (newer) row's oldSalary by default. Override.newSalary breaks
-  // the chain on this row only — row's newSalary becomes the override but
-  // older rows still pivot from this row's oldSalary.
-  let chainNewer = slots[anchorIdx]!.oldSalary;
-  for (let i = anchorIdx - 1; i >= 0; i--) {
+  // Forward walk through ALL rows, oldest → newest. Each row's oldSalary
+  // chains from the previous row's newSalary unless override.oldSalary
+  // pins it. Each row's newSalary = oldSalary + roundUp10(useBase × %/100)
+  // capped at fullSalary, unless override.newSalary pins it.
+  let prevNew: number | null = null;
+  for (let i = 0; i < rounds.length; i++) {
     const cfg = getRowConfig(i, rounds[i]);
     const ovOld = cfg.override?.oldSalary;
     const ovNew = cfg.override?.newSalary;
-    const rowNew =
-      ovNew != null && Number.isFinite(ovNew)
-        ? Math.min(ovNew, cfg.rowBaseInfo.fullSalary)
-        : chainNewer;
-    const rowOld =
-      ovOld != null && Number.isFinite(ovOld)
-        ? ovOld
-        : reverseOldSalary(rowNew, cfg.percent, cfg.rowBaseInfo);
-    const useBase = selectBaseForSalary(rowOld, cfg.rowBaseInfo);
-    const rawIncrease = useBase * (cfg.percent / 100);
-    const actualIncrease = Math.max(0, rowNew - rowOld);
-    slots[i] = {
-      period: cfg.rowDate.toISOString(),
-      periodLabel: formatLabel(cfg.rowDate),
-      level: cfg.rowLevel,
-      oldSalary: rowOld,
-      maxSalary: cfg.rowBaseInfo.fullSalary,
-      base: useBase,
-      percent: cfg.percent,
-      increase: Math.round(rawIncrease * 100) / 100,
-      actualIncrease,
-      newSalary: rowNew,
-      isEstimated: cfg.isEstimated,
-      isCurrent: cfg.isCurrent,
-      monthsInWindow: 0,
-    };
-    chainNewer = rowOld;
-  }
 
-  // FORWARD walk: from anchorIdx+1 to rounds.length-1. Each row's oldSalary
-  // is the previous (older) row's newSalary unless override.oldSalary is set.
-  // Override.newSalary pins the row's newSalary directly (capped at full).
-  // actualIncrease ALWAYS reflects the real change after cap — so when a
-  // raise pushes the salary past fullSalary, actualIncrease shows the
-  // partial bump (not the uncapped raw amount), and subsequent rows at
-  // fullSalary show actualIncrease = 0.
-  let chainOlder = slots[anchorIdx]!.newSalary;
-  for (let i = anchorIdx + 1; i < rounds.length; i++) {
-    const cfg = getRowConfig(i, rounds[i]);
-    const ovOld = cfg.override?.oldSalary;
-    const ovNew = cfg.override?.newSalary;
-    const rowOld =
-      ovOld != null && Number.isFinite(ovOld) ? ovOld : chainOlder;
+    let rowOld: number;
+    if (ovOld != null && Number.isFinite(ovOld)) {
+      rowOld = ovOld;
+    } else if (prevNew !== null) {
+      rowOld = prevNew;
+    } else {
+      rowOld = seedFirstOldSalary;
+    }
+
     const useBase = selectBaseForSalary(rowOld, cfg.rowBaseInfo);
     const rawIncrease = useBase * (cfg.percent / 100);
     const proposedIncrease = roundUp10(rawIncrease);
@@ -531,11 +480,12 @@ export function generateSalaryTable(
       rowOld + proposedIncrease,
       cfg.rowBaseInfo.fullSalary,
     );
-    const cappedNew =
+    const rowNew =
       ovNew != null && Number.isFinite(ovNew)
         ? Math.min(ovNew, cfg.rowBaseInfo.fullSalary)
         : computedNew;
-    const actualIncrease = Math.max(0, cappedNew - rowOld);
+    const actualIncrease = Math.max(0, rowNew - rowOld);
+
     slots[i] = {
       period: cfg.rowDate.toISOString(),
       periodLabel: formatLabel(cfg.rowDate),
@@ -546,12 +496,13 @@ export function generateSalaryTable(
       percent: cfg.percent,
       increase: Math.round(rawIncrease * 100) / 100,
       actualIncrease,
-      newSalary: cappedNew,
+      newSalary: rowNew,
       isEstimated: cfg.isEstimated,
       isCurrent: cfg.isCurrent,
       monthsInWindow: 0,
     };
-    chainOlder = cappedNew;
+
+    prevNew = rowNew;
   }
 
   for (const r of slots) if (r) records.push(r);
