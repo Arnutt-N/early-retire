@@ -90,9 +90,23 @@ export default function Home() {
 
   const updateForm = (updates: Partial<FormState>) => {
     setForm((prev) => {
+      // If the window-shifting inputs change (exit date, last raise date, or
+      // GFP/non-GFP mode), the salary table's row count and round dates shift.
+      // Per-row overrides indexed by position would silently apply to the
+      // wrong rows in the new window — clear them so the user sees fresh
+      // defaults after going back to edit an earlier step.
+      const windowKeys: (keyof FormState)[] = [
+        "endDate",
+        "latestAssessmentDate",
+        "mode",
+      ];
+      const windowChanged = windowKeys.some(
+        (k) => k in updates && updates[k] !== prev[k],
+      );
       const next: FormState = {
         ...prev,
         ...updates,
+        ...(windowChanged ? { salaryOverrides: [] } : {}),
         __schemaVersion: FORM_STATE_SCHEMA_VERSION,
       };
       try {
