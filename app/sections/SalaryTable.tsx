@@ -9,7 +9,7 @@ import {
   Calculator,
   TrendingUp,
   AlertCircle,
-  Eraser,
+  RotateCcw,
   ChevronLeft,
   Settings,
   Pencil,
@@ -697,7 +697,7 @@ export default function SalaryTableSection({
                                     : "ยังไม่มีการแก้ไขที่จะลบ"
                                 }
                               >
-                                <Eraser size={14} />
+                                <RotateCcw size={14} />
                               </button>
                             </div>
                           </td>
@@ -943,7 +943,7 @@ export default function SalaryTableSection({
                                   : "ยังไม่มีการแก้ไขที่จะลบ"
                               }
                             >
-                              <Eraser size={14} />
+                              <RotateCcw size={14} />
                             </button>
                           </div>
                         </td>
@@ -1157,7 +1157,7 @@ export default function SalaryTableSection({
                         disabled={!markerHasOverride}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500"
                       >
-                        <Eraser size={12} />
+                        <RotateCcw size={12} />
                         ล้างค่า
                       </button>
                     </div>
@@ -1416,7 +1416,7 @@ export default function SalaryTableSection({
                               disabled={!hasOverride}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500"
                             >
-                              <Eraser size={12} />
+                              <RotateCcw size={12} />
                               ล้างค่า
                             </button>
                           </div>
