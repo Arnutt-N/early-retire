@@ -56,15 +56,52 @@ export default function SalaryTableSection({
     setPercentDraft(String(ov?.percent ?? r?.percent ?? ""));
     setOldSalaryDraft(String(ov?.oldSalary ?? r?.oldSalary ?? ""));
     setNewSalaryDraft(String(ov?.newSalary ?? r?.newSalary ?? ""));
+    setActiveField(null);
     setEditingIdx(idx);
   };
+
+  // Tracks the most recently typed field so its draft string wins over the
+  // live recomputed value (preserves intermediate states like "3."). Untyped
+  // fields fall back to the live computed value, so editing one field
+  // immediately updates the displayed values of the others.
+  const [activeField, setActiveField] = useState<
+    "oldSalary" | "percent" | "newSalary" | null
+  >(null);
 
   const stopEdit = () => {
     setPercentDraft("");
     setOldSalaryDraft("");
     setNewSalaryDraft("");
+    setActiveField(null);
     setEditingIdx(null);
   };
+
+  // Display values for the numeric inputs. When the user is actively typing
+  // in a field (activeField === "X"), use the draft string. Otherwise fall
+  // back to the override value (if pinned) or the live computed value from
+  // records — so editing % or oldSalary immediately reflects in the other
+  // inputs and the ฐาน / เลื่อนจริง / เงินเดือนใหม่ cells.
+  const editingRecord = editingIdx !== null ? records[editingIdx] : null;
+  const editingOverride =
+    editingIdx !== null ? form.salaryOverrides[editingIdx] : null;
+  const oldSalaryDisplay =
+    activeField === "oldSalary"
+      ? oldSalaryDraft
+      : editingOverride?.oldSalary != null
+        ? String(editingOverride.oldSalary)
+        : String(editingRecord?.oldSalary ?? "");
+  const percentDisplay =
+    activeField === "percent"
+      ? percentDraft
+      : editingOverride?.percent != null
+        ? String(editingOverride.percent)
+        : String(editingRecord?.percent ?? "");
+  const newSalaryDisplay =
+    activeField === "newSalary"
+      ? newSalaryDraft
+      : editingOverride?.newSalary != null
+        ? String(editingOverride.newSalary)
+        : String(editingRecord?.newSalary ?? "");
 
   const updateOverride = (idx: number, partial: Partial<SalaryOverride>) => {
     const overrides = [...form.salaryOverrides];
@@ -518,13 +555,14 @@ export default function SalaryTableSection({
                                 type="text"
                                 inputMode="decimal"
                                 pattern="[0-9]*[.]?[0-9]*"
-                                value={oldSalaryDraft}
+                                value={oldSalaryDisplay}
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => {
                                   const cleaned = e.target.value
                                     .replace(/[^\d.]/g, "")
                                     .replace(/(\..*?)\..*/, "$1");
                                   setOldSalaryDraft(cleaned);
+                                  setActiveField("oldSalary");
                                   const v = parseFloat(cleaned);
                                   updateOverride(i, {
                                     oldSalary: isNaN(v) ? null : v,
@@ -558,13 +596,14 @@ export default function SalaryTableSection({
                                 type="text"
                                 inputMode="decimal"
                                 pattern="[0-9]*[.]?[0-9]*"
-                                value={percentDraft}
+                                value={percentDisplay}
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => {
                                   const cleaned = e.target.value
                                     .replace(/[^\d.]/g, "")
                                     .replace(/(\..*?)\..*/, "$1");
                                   setPercentDraft(cleaned);
+                                  setActiveField("percent");
                                   const v = parseFloat(cleaned);
                                   updateOverride(i, {
                                     percent: isNaN(v) ? null : v,
@@ -603,13 +642,14 @@ export default function SalaryTableSection({
                                 type="text"
                                 inputMode="decimal"
                                 pattern="[0-9]*[.]?[0-9]*"
-                                value={newSalaryDraft}
+                                value={newSalaryDisplay}
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => {
                                   const cleaned = e.target.value
                                     .replace(/[^\d.]/g, "")
                                     .replace(/(\..*?)\..*/, "$1");
                                   setNewSalaryDraft(cleaned);
+                                  setActiveField("newSalary");
                                   const v = parseFloat(cleaned);
                                   updateOverride(i, {
                                     newSalary: isNaN(v) ? null : v,
@@ -752,13 +792,14 @@ export default function SalaryTableSection({
                               type="text"
                               inputMode="decimal"
                               pattern="[0-9]*[.]?[0-9]*"
-                              value={oldSalaryDraft}
+                              value={oldSalaryDisplay}
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => {
                                 const cleaned = e.target.value
                                   .replace(/[^\d.]/g, "")
                                   .replace(/(\..*?)\..*/, "$1");
                                 setOldSalaryDraft(cleaned);
+                                setActiveField("oldSalary");
                                 const v = parseFloat(cleaned);
                                 updateOverride(i, {
                                   oldSalary: isNaN(v) ? null : v,
@@ -789,13 +830,14 @@ export default function SalaryTableSection({
                               type="text"
                               inputMode="decimal"
                               pattern="[0-9]*[.]?[0-9]*"
-                              value={percentDraft}
+                              value={percentDisplay}
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => {
                                 const cleaned = e.target.value
                                   .replace(/[^\d.]/g, "")
                                   .replace(/(\..*?)\..*/, "$1");
                                 setPercentDraft(cleaned);
+                                setActiveField("percent");
                                 const v = parseFloat(cleaned);
                                 updateOverride(i, {
                                   percent: isNaN(v) ? null : v,
@@ -844,13 +886,14 @@ export default function SalaryTableSection({
                               type="text"
                               inputMode="decimal"
                               pattern="[0-9]*[.]?[0-9]*"
-                              value={newSalaryDraft}
+                              value={newSalaryDisplay}
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => {
                                 const cleaned = e.target.value
                                   .replace(/[^\d.]/g, "")
                                   .replace(/(\..*?)\..*/, "$1");
                                 setNewSalaryDraft(cleaned);
+                                setActiveField("newSalary");
                                 const v = parseFloat(cleaned);
                                 updateOverride(i, {
                                   newSalary: isNaN(v) ? null : v,
@@ -1005,13 +1048,14 @@ export default function SalaryTableSection({
                             type="text"
                             inputMode="decimal"
                             pattern="[0-9]*[.]?[0-9]*"
-                            value={oldSalaryDraft}
+                            value={oldSalaryDisplay}
                             onFocus={(e) => e.target.select()}
                             onChange={(e) => {
                               const cleaned = e.target.value
                                 .replace(/[^\d.]/g, "")
                                 .replace(/(\..*?)\..*/, "$1");
                               setOldSalaryDraft(cleaned);
+                              setActiveField("oldSalary");
                               const v = parseFloat(cleaned);
                               updateOverride(i, {
                                 oldSalary: isNaN(v) ? null : v,
@@ -1031,13 +1075,14 @@ export default function SalaryTableSection({
                             type="text"
                             inputMode="decimal"
                             pattern="[0-9]*[.]?[0-9]*"
-                            value={percentDraft}
+                            value={percentDisplay}
                             onFocus={(e) => e.target.select()}
                             onChange={(e) => {
                               const cleaned = e.target.value
                                 .replace(/[^\d.]/g, "")
                                 .replace(/(\..*?)\..*/, "$1");
                               setPercentDraft(cleaned);
+                              setActiveField("percent");
                               const v = parseFloat(cleaned);
                               updateOverride(i, {
                                 percent: isNaN(v) ? null : v,
@@ -1067,13 +1112,14 @@ export default function SalaryTableSection({
                             type="text"
                             inputMode="decimal"
                             pattern="[0-9]*[.]?[0-9]*"
-                            value={newSalaryDraft}
+                            value={newSalaryDisplay}
                             onFocus={(e) => e.target.select()}
                             onChange={(e) => {
                               const cleaned = e.target.value
                                 .replace(/[^\d.]/g, "")
                                 .replace(/(\..*?)\..*/, "$1");
                               setNewSalaryDraft(cleaned);
+                              setActiveField("newSalary");
                               const v = parseFloat(cleaned);
                               updateOverride(i, {
                                 newSalary: isNaN(v) ? null : v,
@@ -1239,7 +1285,7 @@ export default function SalaryTableSection({
                                   type="text"
                                   inputMode="decimal"
                                   pattern="[0-9]*[.]?[0-9]*"
-                                  value={oldSalaryDraft}
+                                  value={oldSalaryDisplay}
                                   onFocus={(e) => e.target.select()}
                                   onChange={(e) => {
                                     const cleaned = e.target.value
@@ -1263,7 +1309,7 @@ export default function SalaryTableSection({
                                   type="text"
                                   inputMode="decimal"
                                   pattern="[0-9]*[.]?[0-9]*"
-                                  value={percentDraft}
+                                  value={percentDisplay}
                                   onFocus={(e) => e.target.select()}
                                   onChange={(e) => {
                                     const cleaned = e.target.value
@@ -1299,7 +1345,7 @@ export default function SalaryTableSection({
                                   type="text"
                                   inputMode="decimal"
                                   pattern="[0-9]*[.]?[0-9]*"
-                                  value={newSalaryDraft}
+                                  value={newSalaryDisplay}
                                   onFocus={(e) => e.target.select()}
                                   onChange={(e) => {
                                     const cleaned = e.target.value
