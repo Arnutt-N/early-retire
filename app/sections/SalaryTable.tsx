@@ -267,20 +267,20 @@ export default function SalaryTableSection({
       </div>
 
       {/* Default Level Picker */}
-      <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-100 rounded-2xl p-5">
+      <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-100 rounded-2xl p-6">
         <div className="flex items-center gap-2 mb-2">
           <Settings size={18} className="text-violet-600" />
           <label className="text-sm font-semibold text-violet-900">
             ระดับตำแหน่งของคุณ
           </label>
         </div>
-        <p className="text-xs text-violet-600 mb-3">
+        <p className="text-xs text-violet-600 mb-4">
           ใช้เป็นค่าเริ่มต้นของทุกแถว — สามารถแก้ไขรายแถวด้านล่างได้หากตำแหน่งเปลี่ยน
         </p>
         <select
           value={form.defaultLevel}
           onChange={(e) => updateForm({ defaultLevel: e.target.value })}
-          className="w-full px-4 py-3 min-h-[48px] rounded-xl border-2 border-violet-200 bg-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-200 font-medium text-gray-900 cursor-pointer"
+          className="block w-full px-4 py-3 min-h-[48px] rounded-xl border-2 border-violet-200 bg-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-200 font-medium text-gray-900 cursor-pointer"
         >
           {LEVEL_DISPLAY_ORDER.map((l) => (
             <option key={l.value} value={l.value}>

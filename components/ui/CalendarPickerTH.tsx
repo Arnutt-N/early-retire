@@ -403,10 +403,10 @@ export default function CalendarPickerTH({
           aria-label="เปิดปฏิทินเลือกวันที่"
           title="เปิดปฏิทิน (หรือพิมพ์วันที่ในช่องด้านซ้าย)"
           className={cn(
-            "p-2.5 rounded-lg transition-all duration-200",
+            "shrink-0 p-2 rounded-lg transition-all duration-200",
             isOpen
               ? "bg-blue-500 text-white"
-              : "bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           )}
         >
           <Calendar size={18} />
