@@ -1292,6 +1292,7 @@ export default function SalaryTableSection({
                                       .replace(/[^\d.]/g, "")
                                       .replace(/(\..*?)\..*/, "$1");
                                     setOldSalaryDraft(cleaned);
+                                    setActiveField("oldSalary");
                                     const v = parseFloat(cleaned);
                                     updateOverride(i, {
                                       oldSalary: isNaN(v) ? null : v,
@@ -1316,6 +1317,7 @@ export default function SalaryTableSection({
                                       .replace(/[^\d.]/g, "")
                                       .replace(/(\..*?)\..*/, "$1");
                                     setPercentDraft(cleaned);
+                                    setActiveField("percent");
                                     const v = parseFloat(cleaned);
                                     updateOverride(i, {
                                       percent: isNaN(v) ? null : v,
@@ -1352,6 +1354,7 @@ export default function SalaryTableSection({
                                       .replace(/[^\d.]/g, "")
                                       .replace(/(\..*?)\..*/, "$1");
                                     setNewSalaryDraft(cleaned);
+                                    setActiveField("newSalary");
                                     const v = parseFloat(cleaned);
                                     updateOverride(i, {
                                       newSalary: isNaN(v) ? null : v,
