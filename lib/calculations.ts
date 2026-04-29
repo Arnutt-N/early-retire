@@ -444,10 +444,17 @@ export function generateSalaryTable(
   // (Cascade rule the user expects: editing any old row's oldSalary or %
   // propagates forward to all newer rows. The anchor's currentSalary acts as
   // a default seed only — the user's explicit edits take precedence.)
+  //
+  // Loop runs i = anchorIdx → 0 (inclusive). At iteration start, `salary`
+  // holds the NEW salary at row i; `reverseOldSalary` converts it to the OLD
+  // salary at row i. The chain assumption (oldSalary[i] = newSalary[i-1])
+  // means after each step, `salary` is also the NEW salary at row i-1, ready
+  // for the next iteration. After the final i=0 step, `salary` = oldSalary
+  // at row 0 — the seed we need.
   let seedFirstOldSalary: number;
   {
     let salary = currentSalary;
-    for (let i = anchorIdx; i >= 1; i--) {
+    for (let i = anchorIdx; i >= 0; i--) {
       const cfg = getRowConfig(i, rounds[i]);
       salary = reverseOldSalary(salary, cfg.percent, cfg.rowBaseInfo);
     }
