@@ -435,81 +435,126 @@ export function generateSalaryTable(
 
   const slots: (SalaryRecord | null)[] = new Array(rounds.length).fill(null);
 
-  // Compute the DEFAULT oldSalary for the OLDEST row by reversing back from
-  // currentSalary through every row's percent. This is only the seed used
-  // when row 0 has no override.oldSalary — once user pins ANY field, the
-  // forward walk below recomputes everything from that pivot onward, even
-  // overriding the anchor row's newSalary if necessary.
+  // Anchor the chain at anchorIdx so newSalary[anchorIdx] = currentSalary
+  // unconditionally (unless explicitly overridden). The bracket-boundary
+  // "gap" — newSalary values that have no valid forward-consistent oldSalary
+  // — would otherwise make the seed-then-forward strategy diverge from
+  // currentSalary by the time it reached the anchor row. Splitting into
+  // independent backward and forward walks keeps the anchor pinned.
   //
-  // (Cascade rule the user expects: editing any old row's oldSalary or %
-  // propagates forward to all newer rows. The anchor's currentSalary acts as
-  // a default seed only — the user's explicit edits take precedence.)
-  //
-  // Loop runs i = anchorIdx → 0 (inclusive). At iteration start, `salary`
-  // holds the NEW salary at row i; `reverseOldSalary` converts it to the OLD
-  // salary at row i. The chain assumption (oldSalary[i] = newSalary[i-1])
-  // means after each step, `salary` is also the NEW salary at row i-1, ready
-  // for the next iteration. After the final i=0 step, `salary` = oldSalary
-  // at row 0 — the seed we need.
-  let seedFirstOldSalary: number;
-  {
-    let salary = currentSalary;
-    for (let i = anchorIdx; i >= 0; i--) {
-      const cfg = getRowConfig(i, rounds[i]);
-      salary = reverseOldSalary(salary, cfg.percent, cfg.rowBaseInfo);
-    }
-    seedFirstOldSalary = salary;
-  }
+  // Helpers compute one row's full record. forwardRow assumes oldSalary is
+  // known and computes newSalary; backwardRow assumes newSalary is known
+  // and computes oldSalary via reverseOldSalary. Each respects per-row
+  // overrides.
+  const buildRecord = (
+    cfg: ReturnType<typeof getRowConfig>,
+    rowOld: number,
+    rowNew: number,
+    useBase: number,
+  ): SalaryRecord => {
+    const rawIncrease = useBase * (cfg.percent / 100);
+    const cappedNew = Math.min(rowNew, cfg.rowBaseInfo.fullSalary);
+    const cappedOld = Math.min(rowOld, cfg.rowBaseInfo.fullSalary);
+    return {
+      period: cfg.rowDate.toISOString(),
+      periodLabel: formatLabel(cfg.rowDate),
+      level: cfg.rowLevel,
+      oldSalary: cappedOld,
+      maxSalary: cfg.rowBaseInfo.fullSalary,
+      base: useBase,
+      percent: cfg.percent,
+      increase: Math.round(rawIncrease * 100) / 100,
+      actualIncrease: Math.max(0, cappedNew - cappedOld),
+      newSalary: cappedNew,
+      isEstimated: cfg.isEstimated,
+      isCurrent: cfg.isCurrent,
+      monthsInWindow: 0,
+    };
+  };
 
-  // Forward walk through ALL rows, oldest → newest. Each row's oldSalary
-  // chains from the previous row's newSalary unless override.oldSalary
-  // pins it. Each row's newSalary = oldSalary + roundUp10(useBase × %/100)
-  // capped at fullSalary, unless override.newSalary pins it.
-  let prevNew: number | null = null;
-  for (let i = 0; i < rounds.length; i++) {
+  const forwardRow = (i: number, rowOld: number) => {
     const cfg = getRowConfig(i, rounds[i]);
     const ovOld = cfg.override?.oldSalary;
     const ovNew = cfg.override?.newSalary;
-
-    let rowOld: number;
-    if (ovOld != null && Number.isFinite(ovOld)) {
-      rowOld = ovOld;
-    } else if (prevNew !== null) {
-      rowOld = prevNew;
-    } else {
-      rowOld = seedFirstOldSalary;
-    }
-
-    const useBase = selectBaseForSalary(rowOld, cfg.rowBaseInfo);
+    const baseOld = ovOld != null && Number.isFinite(ovOld) ? ovOld : rowOld;
+    const useBase = selectBaseForSalary(baseOld, cfg.rowBaseInfo);
     const rawIncrease = useBase * (cfg.percent / 100);
     const proposedIncrease = roundUp10(rawIncrease);
     const computedNew = Math.min(
-      rowOld + proposedIncrease,
+      baseOld + proposedIncrease,
       cfg.rowBaseInfo.fullSalary,
     );
     const rowNew =
       ovNew != null && Number.isFinite(ovNew)
         ? Math.min(ovNew, cfg.rowBaseInfo.fullSalary)
         : computedNew;
-    const actualIncrease = Math.max(0, rowNew - rowOld);
+    slots[i] = buildRecord(cfg, baseOld, rowNew, useBase);
+    return { newSalary: rowNew };
+  };
 
-    slots[i] = {
-      period: cfg.rowDate.toISOString(),
-      periodLabel: formatLabel(cfg.rowDate),
-      level: cfg.rowLevel,
-      oldSalary: rowOld,
-      maxSalary: cfg.rowBaseInfo.fullSalary,
-      base: useBase,
-      percent: cfg.percent,
-      increase: Math.round(rawIncrease * 100) / 100,
-      actualIncrease,
-      newSalary: rowNew,
-      isEstimated: cfg.isEstimated,
-      isCurrent: cfg.isCurrent,
-      monthsInWindow: 0,
-    };
+  const backwardRow = (i: number, rowNew: number) => {
+    const cfg = getRowConfig(i, rounds[i]);
+    const ovOld = cfg.override?.oldSalary;
+    const ovNew = cfg.override?.newSalary;
+    const targetNew =
+      ovNew != null && Number.isFinite(ovNew)
+        ? Math.min(ovNew, cfg.rowBaseInfo.fullSalary)
+        : rowNew;
+    const computedOld = reverseOldSalary(
+      targetNew,
+      cfg.percent,
+      cfg.rowBaseInfo,
+    );
+    const baseOld =
+      ovOld != null && Number.isFinite(ovOld) ? ovOld : computedOld;
+    // Pick the displayed base such that base * %/100 ≈ (targetNew - baseOld).
+    // For the common case this matches selectBaseForSalary(baseOld); at
+    // bracket-gap newSalary values it may slightly differ — in that case use
+    // selectBaseForSalary(baseOld) as a stable fallback so the row still
+    // reads meaningfully.
+    const useBase = selectBaseForSalary(baseOld, cfg.rowBaseInfo);
+    slots[i] = buildRecord(cfg, baseOld, targetNew, useBase);
+    return { oldSalary: baseOld };
+  };
 
-    prevNew = rowNew;
+  // Compute the anchor row first so newSalary = currentSalary is locked in.
+  {
+    const anchorCfg = getRowConfig(anchorIdx, rounds[anchorIdx]);
+    const ovNew = anchorCfg.override?.newSalary;
+    const ovOld = anchorCfg.override?.oldSalary;
+    const anchorNew =
+      ovNew != null && Number.isFinite(ovNew)
+        ? Math.min(ovNew, anchorCfg.rowBaseInfo.fullSalary)
+        : currentSalary;
+    const computedOld = reverseOldSalary(
+      anchorNew,
+      anchorCfg.percent,
+      anchorCfg.rowBaseInfo,
+    );
+    const anchorOld =
+      ovOld != null && Number.isFinite(ovOld) ? ovOld : computedOld;
+    const useBase = selectBaseForSalary(anchorOld, anchorCfg.rowBaseInfo);
+    slots[anchorIdx] = buildRecord(anchorCfg, anchorOld, anchorNew, useBase);
+  }
+
+  // Backward walk: rows older than the anchor. Each row's newSalary defaults
+  // to the next (newer) row's oldSalary; oldSalary derived via reverse.
+  {
+    let nextOld = slots[anchorIdx]!.oldSalary;
+    for (let i = anchorIdx - 1; i >= 0; i--) {
+      const { oldSalary } = backwardRow(i, nextOld);
+      nextOld = oldSalary;
+    }
+  }
+
+  // Forward walk: rows newer than the anchor. Each row's oldSalary defaults
+  // to the previous (older) row's newSalary; newSalary computed forward.
+  {
+    let prevNew = slots[anchorIdx]!.newSalary;
+    for (let i = anchorIdx + 1; i < rounds.length; i++) {
+      const { newSalary } = forwardRow(i, prevNew);
+      prevNew = newSalary;
+    }
   }
 
   for (const r of slots) if (r) records.push(r);
