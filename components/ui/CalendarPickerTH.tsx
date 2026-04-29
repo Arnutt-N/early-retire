@@ -314,7 +314,7 @@ export default function CalendarPickerTH({
       
       {/* Input Container */}
       <div className={cn(
-        "relative flex items-center gap-1 pl-1 pr-4 py-1 rounded-xl border-2 bg-white transition-all duration-200",
+        "relative flex items-center pl-1 pr-3 py-1 rounded-xl border-2 bg-white transition-all duration-200",
         error || localError
           ? "border-red-300 focus-within:border-red-500"
           : "border-gray-200 hover:border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100"
@@ -332,9 +332,9 @@ export default function CalendarPickerTH({
           aria-label="วันที่"
           className="w-12 px-2 py-2.5 text-center text-sm font-medium bg-transparent focus:outline-none placeholder:text-gray-300"
         />
-        
+
         <span className="text-gray-300 font-light">/</span>
-        
+
         {/* Month Input */}
         <input
           ref={monthRef}
@@ -348,9 +348,9 @@ export default function CalendarPickerTH({
           aria-label="เดือน"
           className="w-12 px-2 py-2.5 text-center text-sm font-medium bg-transparent focus:outline-none placeholder:text-gray-300"
         />
-        
+
         <span className="text-gray-300 font-light">/</span>
-        
+
         {/* Year Input */}
         <input
           ref={yearRef}
@@ -365,52 +365,55 @@ export default function CalendarPickerTH({
           className="flex-1 min-w-[60px] px-2 py-2.5 text-center text-sm font-medium bg-transparent focus:outline-none placeholder:text-gray-300"
         />
 
-        {/* Valid indicator */}
-        {hasValue && !isEditing && !localError && (
-          <span
-            className="p-2 text-emerald-500"
-            aria-label="วันที่ถูกต้อง"
-            title="วันที่ถูกต้อง"
-          >
-            <Check size={16} strokeWidth={3} />
-          </span>
-        )}
+        {/* Action icons grouped with consistent spacing, separated from year input */}
+        <div className="flex items-center gap-1.5 ml-2 shrink-0">
+          {/* Valid indicator */}
+          {hasValue && !isEditing && !localError && (
+            <span
+              className="p-1.5 text-emerald-500"
+              aria-label="วันที่ถูกต้อง"
+              title="วันที่ถูกต้อง"
+            >
+              <Check size={16} strokeWidth={3} />
+            </span>
+          )}
 
-        {/* Clear Button */}
-        {hasValue && (
+          {/* Clear Button */}
+          {hasValue && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange(null);
+                setLocalError("");
+                if (dayRef.current) dayRef.current.value = "";
+                if (monthRef.current) monthRef.current.value = "";
+                if (yearRef.current) yearRef.current.value = "";
+              }}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              aria-label="ล้างวันที่"
+            >
+              <X size={16} />
+            </button>
+          )}
+
+          {/* Calendar Button */}
           <button
             type="button"
-            onClick={() => {
-              onChange(null);
-              setLocalError("");
-              if (dayRef.current) dayRef.current.value = "";
-              if (monthRef.current) monthRef.current.value = "";
-              if (yearRef.current) yearRef.current.value = "";
-            }}
-            className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            aria-label="ล้างวันที่"
+            onClick={() => setIsOpen((v) => !v)}
+            aria-haspopup="dialog"
+            aria-expanded={isOpen}
+            aria-label="เปิดปฏิทินเลือกวันที่"
+            title="เปิดปฏิทิน (หรือพิมพ์วันที่ในช่องด้านซ้าย)"
+            className={cn(
+              "p-1.5 rounded-lg transition-all duration-200",
+              isOpen
+                ? "bg-blue-500 text-white"
+                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            )}
           >
-            <X size={16} />
+            <Calendar size={18} />
           </button>
-        )}
-
-        {/* Calendar Button */}
-        <button
-          type="button"
-          onClick={() => setIsOpen((v) => !v)}
-          aria-haspopup="dialog"
-          aria-expanded={isOpen}
-          aria-label="เปิดปฏิทินเลือกวันที่"
-          title="เปิดปฏิทิน (หรือพิมพ์วันที่ในช่องด้านซ้าย)"
-          className={cn(
-            "shrink-0 p-2 rounded-lg transition-all duration-200",
-            isOpen
-              ? "bg-blue-500 text-white"
-              : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          )}
-        >
-          <Calendar size={18} />
-        </button>
+        </div>
       </div>
 
       {/* Calendar Popup */}
