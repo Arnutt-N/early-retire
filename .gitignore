@@ -49,3 +49,7 @@ next-env.d.ts
 
 # editor backups
 *.bak
+
+# personal calculation notes / scratch test scenarios (not part of the app)
+improve-cal.txt
+improve-flow-logic.txt
