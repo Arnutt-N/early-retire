@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import DatePickerTH from "@/components/DatePickerTH";
 import Button from "@/components/ui/Button";
-import { calculateRetirementDate } from "@/lib/calculations";
+import { calculateRetirementDate, calculateServicePeriod } from "@/lib/calculations";
 import { FormState } from "@/types";
 import { ChevronLeft, ChevronRight, User, Calendar, AlertCircle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,25 +17,40 @@ interface Props {
 }
 
 const retirementOptions = [
-  { 
-    value: "age60" as const, 
-    label: "เกษียณอายุ 60 ปี", 
+  {
+    value: "age60" as const,
+    label: "เกษียณอายุ 60 ปี",
     description: "คำนวณอัตโนมัติจากวันเกิด",
     recommended: true
   },
-  { 
-    value: "service25" as const, 
-    label: "อายุราชการ 25 ปี", 
+  {
+    value: "service25" as const,
+    label: "อายุราชการ 25 ปี",
     description: "คำนวณจากวันบรรจุ + 25 ปี",
     recommended: false
   },
-  { 
-    value: "custom" as const, 
-    label: "กำหนดเอง", 
+  {
+    value: "age50" as const,
+    label: "อายุตัว 50 ปี",
+    description: "",
+    recommended: false
+  },
+  {
+    value: "custom" as const,
+    label: "กำหนดเอง",
     description: "เลือกวันที่ด้วยตัวเอง",
     recommended: false
   },
 ] as const;
+
+// Day-precise age at a target date — floor of exact years.
+// Mirror of the standard age-from-birth calc; handles month/day boundaries.
+function ageInYearsAt(birth: Date, target: Date): number {
+  let age = target.getFullYear() - birth.getFullYear();
+  const m = target.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && target.getDate() < birth.getDate())) age--;
+  return age;
+}
 
 export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: Props) {
   const [retirementWarning, setRetirementWarning] = useState<string>("");
@@ -52,6 +67,10 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
       setRetirementWarning("กรุณาเลือกวันบรรจุก่อน เพื่อคำนวณวันพ้นราชการอัตโนมัติ");
       return;
     }
+    if (option === "age50" && (!form.birthDate || !form.startDate)) {
+      setRetirementWarning("กรุณาเลือกวันเกิดและวันบรรจุก่อน เพื่อตรวจสอบสิทธิ์");
+      return;
+    }
 
     updateForm({ retirementOption: option });
 
@@ -65,9 +84,48 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
       end.setFullYear(end.getFullYear() + 25);
       updateForm({ endDate: end.toISOString() });
     }
+    // age50 leaves endDate as-is — user must pick manually via the bottom datepicker
   };
 
-  const isValid = form.birthDate && form.startDate && form.endDate;
+  // Eligibility for the "อายุตัว 50 ปี" option: age ≥ 50 AND service ≥ 10 at endDate.
+  // Returns null when option isn't age50 or any prereq date is missing/invalid.
+  const age50Eligibility = useMemo(() => {
+    if (form.retirementOption !== "age50") return null;
+    if (!form.birthDate || !form.startDate || !form.endDate) return null;
+    const birth = new Date(form.birthDate);
+    const start = new Date(form.startDate);
+    const end = new Date(form.endDate);
+    if (
+      isNaN(birth.getTime()) ||
+      isNaN(start.getTime()) ||
+      isNaN(end.getTime())
+    ) {
+      return null;
+    }
+    const age = ageInYearsAt(birth, end);
+    const serviceYears = calculateServicePeriod(start, end, 0).totalYears;
+    const ageOk = age >= 50;
+    const serviceOk = serviceYears >= 10;
+    return {
+      age,
+      serviceYears,
+      ageOk,
+      serviceOk,
+      ok: ageOk && serviceOk,
+      warning: !ageOk
+        ? "อายุยังไม่ถึง 50 ปี ณ วันที่เลือก"
+        : !serviceOk
+          ? "อายุราชการยังไม่ถึง 10 ปี ณ วันที่เลือก"
+          : null,
+    };
+  }, [form.retirementOption, form.birthDate, form.startDate, form.endDate]);
+
+  const age50Block =
+    form.retirementOption === "age50" &&
+    age50Eligibility !== null &&
+    !age50Eligibility.ok;
+  const isValid =
+    !!(form.birthDate && form.startDate && form.endDate) && !age50Block;
   const endAfterStart =
     form.startDate && form.endDate
       ? new Date(form.endDate) > new Date(form.startDate)
@@ -144,7 +202,7 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
         </div>
 
         {/* Options */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {retirementOptions.map((opt) => {
             const isSelected = form.retirementOption === opt.value;
             return (
@@ -188,7 +246,6 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
                     )}>
                       {opt.label}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
                   </div>
                 </div>
               </motion.button>
@@ -212,18 +269,40 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
           )}
         </AnimatePresence>
 
+        {/* Eligibility warning toast for "อายุตัว 50 ปี" — fires when age < 50 OR service < 10 */}
+        <AnimatePresence>
+          {age50Eligibility && !age50Eligibility.ok && age50Eligibility.warning && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              role="alert"
+              className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm"
+            >
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5 text-amber-600" />
+              <p className="font-medium">{age50Eligibility.warning}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Date Picker */}
         <div className="pt-2">
           <DatePickerTH
             value={form.endDate}
             onChange={(d) => {
-              updateForm({ endDate: d, retirementOption: "custom" });
+              // Preserve "age50" selection when the user picks a date manually;
+              // for any other option, free-form date entry implies "custom".
+              const nextOption =
+                form.retirementOption === "age50" ? "age50" : "custom";
+              updateForm({ endDate: d, retirementOption: nextOption });
             }}
             helper={
               form.retirementOption === "age60"
-                ? "✨ คำนวณอัตโนมัติจากวันเกิด (+ 1 ปีหากเกิดตั้งแต่ 1 ต.ค.)"
+                ? "✨ คำนวณอัตโนมัติจากวันเกิด (+ 1 ปีหากเกิดหลัง 1 ต.ค.)"
                 : form.retirementOption === "service25"
                 ? "✨ คำนวณอัตโนมัติจากวันบรรจุ + 25 ปี"
+                : form.retirementOption === "age50"
+                ? "กรอกวันที่พ้นส่วนราชการ (ต้องอายุ 50+ และอายุราชการ 10+ ปี)"
                 : "กรอกวันที่พ้นส่วนราชการ"
             }
           />

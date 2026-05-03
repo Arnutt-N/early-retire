@@ -75,7 +75,7 @@ Pure functions (no React). The five public entry points are `calculateRetirement
 These are pension-domain quirks that show up across the codebase. Follow the existing helpers — don't reinvent them.
 
 1. **Buddhist Era (พ.ศ.) ↔ Common Era**: offset is **543**. Always use `toBE(ce)` / `toCE(be)` from `lib/utils.ts`. Never inline `+ 543` elsewhere. UI displays B.E.; logic and ISO strings use C.E.
-2. **Retirement age**: 60, **+1 year if born on or after October 1** (Thai fiscal-year convention). See `calculateRetirementDate`. Don't add other birth-month logic without checking.
+2. **Retirement age**: 60, **+1 year if born after October 1** (i.e., Oct 2 onwards). Oct 1 itself does NOT trigger +1 — it's the last day of the previous Thai fiscal year. See `calculateRetirementDate`. Don't add other birth-month logic without checking.
 3. **Salary increase rounding**: raw increase is rounded **up to the nearest 10** via `roundUp10` (`Math.ceil(value / 10) * 10`). Not nearest, not floor — up.
 4. **Base selection in `generateSalaryTable`**: if `salary <= baseMid` use `baseBottom`, otherwise `baseTop`. Then `actualIncrease = roundUp10(base × percent / 100)`. New salary clamps at `fullSalary`.
 5. **GFP monthly cap**: `monthly = min(avg60 × years / 50, avg60 × 0.70)`. The 70% cap is the binding constraint for long-serving members.
