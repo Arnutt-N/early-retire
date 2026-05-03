@@ -84,7 +84,7 @@ export interface FormState {
   birthDate: string | null;
   startDate: string | null;
   endDate: string | null;
-  retirementOption: "age60" | "service25" | "custom";
+  retirementOption: "age60" | "service25" | "age50" | "custom";
 
   // Step 2
   multiplierPeriods: MultiplierPeriod[];

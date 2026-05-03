@@ -223,9 +223,15 @@ export default function Home() {
     ) {
       return null;
     }
-    const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
-    const serviceYears = (end.getTime() - start.getTime()) / msPerYear;
-    const ageAtRetirement = (end.getTime() - birth.getTime()) / msPerYear;
+    // Calendar-precise calc (Y + M/12 + D/365) via calculateServicePeriod —
+    // matches the official Thai HR/Excel-template convention used elsewhere
+    // in the engine. Returns exactly 50.0 on the 50th birthday, exactly
+    // 10.0 on the 10th anniversary of วันบรรจุ — so the boundary auto-fill
+    // dates from calculateAge50EligibilityDate satisfy the eligibility check.
+    // (Previously used ms / 365.25 which gave 49.998 on the exact 50th birthday
+    // due to leap-year accumulation, falsely failing eligibleForMonthly.)
+    const serviceYears = calculateServicePeriod(start, end).totalYears;
+    const ageAtRetirement = calculateServicePeriod(birth, end).totalYears;
     const eligibleForLumpSum = serviceYears >= 10;
     const eligibleForMonthly =
       eligibleForLumpSum && (serviceYears >= 25 || ageAtRetirement >= 50);

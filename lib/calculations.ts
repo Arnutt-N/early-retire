@@ -74,15 +74,48 @@ export function selectBaseForSalary(
 
 export function calculateRetirementDate(birthDate: Date): Date {
   let retireYear = birthDate.getFullYear() + 60;
-  const birthMonth = birthDate.getMonth();
+  const birthMonth = birthDate.getMonth(); // 0-based; Oct = 9
+  const birthDay = birthDate.getDate();
 
-  // If born on or after Oct 1 (Thai fiscal-year cutoff), retire one year later.
-  // Retirement always lands on 1 October of the qualifying fiscal year.
-  if (birthMonth >= 9) {
+  // Thai fiscal year runs Oct 1 → Sep 30. Oct 1 is the LAST day of the
+  // previous fiscal year, so it does NOT trigger the +1. Only birthdays
+  // strictly after Oct 1 (Oct 2 onwards through Dec 31) push retirement
+  // by one fiscal year.
+  if (birthMonth > 9 || (birthMonth === 9 && birthDay > 1)) {
     retireYear += 1;
   }
 
-  return new Date(retireYear, 9, 1); // month index 9 = October
+  return new Date(retireYear, 9, 1); // Always lands on 1 October
+}
+
+/**
+ * Earliest end-of-service date that satisfies "age ≥ 50 AND service ≥ 10":
+ * the *later* of (birth + 50 years) and (start + 10 years).
+ *
+ * Mathematically equivalent to `max(dateAge50_completed, dateService10_completed) + 1 day`,
+ * because birth+50 = (last day of being 49) + 1 day, and likewise for service.
+ *
+ * Examples (BE in user-facing text; this fn takes/returns CE Date objects):
+ *   birth 1/1/2524, start 1/1/2555 → 1/1/2574 (age-50 anniversary is the binding constraint)
+ *   birth 1/1/2524, start 1/1/2565 → 1/1/2575 (service-10 anniversary is the binding constraint)
+ *
+ * Both conditions are guaranteed satisfied at the returned date when checked
+ * with calendar-precise arithmetic (Y + M/12 + D/365 — see calculateServicePeriod).
+ */
+export function calculateAge50EligibilityDate(birthDate: Date, startDate: Date): Date {
+  const ageReachDate = new Date(
+    birthDate.getFullYear() + 50,
+    birthDate.getMonth(),
+    birthDate.getDate(),
+  );
+  const serviceReachDate = new Date(
+    startDate.getFullYear() + 10,
+    startDate.getMonth(),
+    startDate.getDate(),
+  );
+  return ageReachDate.getTime() >= serviceReachDate.getTime()
+    ? ageReachDate
+    : serviceReachDate;
 }
 
 export function calculateServicePeriod(

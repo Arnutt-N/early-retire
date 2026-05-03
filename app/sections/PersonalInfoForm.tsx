@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import DatePickerTH from "@/components/DatePickerTH";
 import Button from "@/components/ui/Button";
-import { calculateRetirementDate } from "@/lib/calculations";
+import { calculateRetirementDate, calculateAge50EligibilityDate } from "@/lib/calculations";
 import { FormState } from "@/types";
 import { ChevronLeft, ChevronRight, User, Calendar, AlertCircle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,23 +17,25 @@ interface Props {
 }
 
 const retirementOptions = [
-  { 
-    value: "age60" as const, 
-    label: "เกษียณอายุ 60 ปี", 
-    description: "คำนวณอัตโนมัติจากวันเกิด",
-    recommended: true
+  {
+    value: "age60" as const,
+    label: "เกษียณอายุ 60 ปี",
+    recommended: true,
   },
-  { 
-    value: "service25" as const, 
-    label: "อายุราชการ 25 ปี", 
-    description: "คำนวณจากวันบรรจุ + 25 ปี",
-    recommended: false
+  {
+    value: "service25" as const,
+    label: "อายุราชการ 25 ปี",
+    recommended: false,
   },
-  { 
-    value: "custom" as const, 
-    label: "กำหนดเอง", 
-    description: "เลือกวันที่ด้วยตัวเอง",
-    recommended: false
+  {
+    value: "age50" as const,
+    label: "อายุ 50 ปี ขึ้นไป",
+    recommended: false,
+  },
+  {
+    value: "custom" as const,
+    label: "กำหนดเอง",
+    recommended: false,
   },
 ] as const;
 
@@ -43,13 +45,18 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
   const handleRetirementOption = (option: FormState["retirementOption"]) => {
     setRetirementWarning("");
 
-    // Validation: require prereq date for auto-calc options
+    // Validation: require prereq date(s) before selecting an auto-calc option.
+    // age60 needs birthDate. service25 needs startDate. age50 needs BOTH.
     if (option === "age60" && !form.birthDate) {
       setRetirementWarning("กรุณาเลือกวันเดือนปีเกิดก่อน เพื่อคำนวณวันเกษียณอัตโนมัติ");
       return;
     }
     if (option === "service25" && !form.startDate) {
       setRetirementWarning("กรุณาเลือกวันบรรจุก่อน เพื่อคำนวณวันพ้นราชการอัตโนมัติ");
+      return;
+    }
+    if (option === "age50" && (!form.birthDate || !form.startDate)) {
+      setRetirementWarning("กรุณาเลือกวันเกิดและวันบรรจุก่อน เพื่อคำนวณวันที่เข้าเงื่อนไขอัตโนมัติ");
       return;
     }
 
@@ -63,6 +70,11 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
       const start = new Date(form.startDate);
       const end = new Date(start);
       end.setFullYear(end.getFullYear() + 25);
+      updateForm({ endDate: end.toISOString() });
+    } else if (option === "age50" && form.birthDate && form.startDate) {
+      const birth = new Date(form.birthDate);
+      const start = new Date(form.startDate);
+      const end = calculateAge50EligibilityDate(birth, start);
       updateForm({ endDate: end.toISOString() });
     }
   };
@@ -104,11 +116,16 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
             value={form.birthDate}
             onChange={(d) => {
               updateForm({ birthDate: d });
-              // Auto-calculate retirement date if age60 is selected
+              // Auto-recompute the dependent end date for whichever option is active.
               if (form.retirementOption === "age60" && d) {
                 const birth = new Date(d);
                 const retire = calculateRetirementDate(birth);
                 updateForm({ endDate: retire.toISOString() });
+              } else if (form.retirementOption === "age50" && d && form.startDate) {
+                const birth = new Date(d);
+                const start = new Date(form.startDate);
+                const end = calculateAge50EligibilityDate(birth, start);
+                updateForm({ endDate: end.toISOString() });
               }
             }}
             required
@@ -119,11 +136,16 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
             value={form.startDate}
             onChange={(d) => {
               updateForm({ startDate: d });
-              // Auto-calculate if service25 is selected
+              // Auto-recompute for service25 (needs only start) or age50 (needs both).
               if (form.retirementOption === "service25" && d) {
                 const start = new Date(d);
                 const end = new Date(start);
                 end.setFullYear(end.getFullYear() + 25);
+                updateForm({ endDate: end.toISOString() });
+              } else if (form.retirementOption === "age50" && d && form.birthDate) {
+                const birth = new Date(form.birthDate);
+                const start = new Date(d);
+                const end = calculateAge50EligibilityDate(birth, start);
                 updateForm({ endDate: end.toISOString() });
               }
             }}
@@ -144,7 +166,7 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
         </div>
 
         {/* Options */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {retirementOptions.map((opt) => {
             const isSelected = form.retirementOption === opt.value;
             return (
@@ -188,7 +210,6 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
                     )}>
                       {opt.label}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
                   </div>
                 </div>
               </motion.button>
@@ -217,13 +238,19 @@ export default function PersonalInfoForm({ form, updateForm, onNext, onBack }: P
           <DatePickerTH
             value={form.endDate}
             onChange={(d) => {
+              // Manual date entry implies "custom" — but if user only changes
+              // a single sub-field of an auto-calc option, the picker will fire
+              // onChange on every blur. We keep the "flip to custom" behavior
+              // intact (matches prior service25/age60 UX) for explicit edits.
               updateForm({ endDate: d, retirementOption: "custom" });
             }}
             helper={
               form.retirementOption === "age60"
-                ? "✨ คำนวณอัตโนมัติจากวันเกิด (+ 1 ปีหากเกิดตั้งแต่ 1 ต.ค.)"
+                ? "✨ คำนวณอัตโนมัติจากวันเกิด (+ 1 ปีหากเกิดหลัง 1 ต.ค.)"
                 : form.retirementOption === "service25"
                 ? "✨ คำนวณอัตโนมัติจากวันบรรจุ + 25 ปี"
+                : form.retirementOption === "age50"
+                ? "✨ คำนวณอัตโนมัติ — วันที่อายุครบ 50 ปี และอายุราชการ 10 ปี เข้าเงื่อนไขทั้งสองข้อ"
                 : "กรอกวันที่พ้นส่วนราชการ"
             }
           />
