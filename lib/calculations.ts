@@ -392,6 +392,29 @@ export function generateSalaryTable(
   if (anchorIdx === -1) anchorIdx = rounds.length - 1;
 
   // Reverse-compute oldSalary given a known newSalary, percent, and level.
+  // Pick the base value to *display* on a row. Normally matches
+  // selectBaseForSalary(rowOld), but at the bracket-boundary "gap" the
+  // anchor's reverse-computed oldSalary may sit in the OTHER bracket from the
+  // one that produced its actualIncrease. In that case display the base whose
+  // (base × %) rounds to the row's actual increase, so the row reads
+  // coherently (base × % ≈ +increase column).
+  const inferDisplayBase = (
+    rowOld: number,
+    rowNew: number,
+    percent: number,
+    baseInfo: SalaryBaseInfo,
+  ): number => {
+    const actualIncrease = Math.max(0, rowNew - rowOld);
+    if (actualIncrease <= 0 || percent <= 0) {
+      return selectBaseForSalary(rowOld, baseInfo);
+    }
+    const incBottom = roundUp10(baseInfo.baseBottom * (percent / 100));
+    if (incBottom === actualIncrease) return baseInfo.baseBottom;
+    const incTop = roundUp10(baseInfo.baseTop * (percent / 100));
+    if (incTop === actualIncrease) return baseInfo.baseTop;
+    return selectBaseForSalary(rowOld, baseInfo);
+  };
+
   // Formula (forward): newSalary = oldSalary + roundUp10(useBase × %/100),
   // where useBase = baseBottom if oldSalary ≤ baseMid else baseTop.
   // Inverse: try both bracket assumptions and pick the one whose candidate
@@ -502,16 +525,26 @@ export function generateSalaryTable(
     rowNew: number,
     useBase: number,
   ): SalaryRecord => {
-    const rawIncrease = useBase * (cfg.percent / 100);
     const cappedNew = Math.min(rowNew, cfg.rowBaseInfo.fullSalary);
     const cappedOld = Math.min(rowOld, cfg.rowBaseInfo.fullSalary);
+    // Re-pick base from the actual increase so the displayed (base × %) line
+    // up with the +increase column even at the bracket-boundary gap. Falls
+    // back to the caller's useBase via selectBaseForSalary inside the helper.
+    const displayBase = inferDisplayBase(
+      cappedOld,
+      cappedNew,
+      cfg.percent,
+      cfg.rowBaseInfo,
+    );
+    void useBase;
+    const rawIncrease = displayBase * (cfg.percent / 100);
     return {
       period: cfg.rowDate.toISOString(),
       periodLabel: formatLabel(cfg.rowDate),
       level: cfg.rowLevel,
       oldSalary: cappedOld,
       maxSalary: cfg.rowBaseInfo.fullSalary,
-      base: useBase,
+      base: displayBase,
       percent: cfg.percent,
       increase: Math.round(rawIncrease * 100) / 100,
       actualIncrease: Math.max(0, cappedNew - cappedOld),
