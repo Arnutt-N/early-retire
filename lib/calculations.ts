@@ -468,13 +468,30 @@ export function generateSalaryTable(
 
   const slots: (SalaryRecord | null)[] = new Array(rounds.length).fill(null);
 
-  // Anchor the chain at anchorIdx so newSalary[anchorIdx] = currentSalary
-  // unconditionally (unless explicitly overridden). The bracket-boundary
-  // "gap" — newSalary values that have no valid forward-consistent oldSalary
-  // — would otherwise make the seed-then-forward strategy diverge from
-  // currentSalary by the time it reached the anchor row. Splitting into
-  // independent backward and forward walks keeps the anchor pinned.
+  // Cascade strategy depends on whether the user has edited any row at or
+  // before the anchor:
   //
+  // - DEFAULT (no pre-anchor edits): pin the anchor row at newSalary =
+  //   currentSalary, then walk independently backward / forward. This
+  //   guarantees the anchor row matches the user's input even when the
+  //   bracket-boundary "gap" makes the seed-then-forward strategy diverge.
+  //
+  // - WITH PRE-ANCHOR EDITS (level / percent / oldSalary at any row 0..anchor):
+  //   forward-cascade from row 0 through the entire table so user edits
+  //   propagate to ALL newer rows (the user's mental model — change a row's
+  //   %, see the chain update onward). The anchor row's newSalary may drift
+  //   from currentSalary; that's the price of "edits win". Pinned newSalary
+  //   overrides still win at any row.
+  const hasPreAnchorEdit = overrides.some((o, i) => {
+    if (i > anchorIdx || !o) return false;
+    // Anchor row's newSalary override is the legitimate "override the anchor
+    // lock" case (PR #48 semantics) — keep using anchor-pin strategy. Edits
+    // at strictly earlier rows (including newSalary pins) should propagate
+    // forward via cascade.
+    if (i < anchorIdx && o.newSalary != null) return true;
+    return o.level != null || o.percent != null || o.oldSalary != null;
+  });
+
   // Helpers compute one row's full record. forwardRow assumes oldSalary is
   // known and computes newSalary; backwardRow assumes newSalary is known
   // and computes oldSalary via reverseOldSalary. Each respects per-row
@@ -550,43 +567,75 @@ export function generateSalaryTable(
     return { oldSalary: baseOld };
   };
 
-  // Compute the anchor row first so newSalary = currentSalary is locked in.
-  {
-    const anchorCfg = getRowConfig(anchorIdx, rounds[anchorIdx]);
-    const ovNew = anchorCfg.override?.newSalary;
-    const ovOld = anchorCfg.override?.oldSalary;
-    const anchorNew =
-      ovNew != null && Number.isFinite(ovNew)
-        ? Math.min(ovNew, anchorCfg.rowBaseInfo.fullSalary)
-        : currentSalary;
-    const computedOld = reverseOldSalary(
-      anchorNew,
-      anchorCfg.percent,
-      anchorCfg.rowBaseInfo,
-    );
-    const anchorOld =
-      ovOld != null && Number.isFinite(ovOld) ? ovOld : computedOld;
-    const useBase = selectBaseForSalary(anchorOld, anchorCfg.rowBaseInfo);
-    slots[anchorIdx] = buildRecord(anchorCfg, anchorOld, anchorNew, useBase);
-  }
-
-  // Backward walk: rows older than the anchor. Each row's newSalary defaults
-  // to the next (newer) row's oldSalary; oldSalary derived via reverse.
-  {
-    let nextOld = slots[anchorIdx]!.oldSalary;
-    for (let i = anchorIdx - 1; i >= 0; i--) {
-      const { oldSalary } = backwardRow(i, nextOld);
-      nextOld = oldSalary;
+  if (hasPreAnchorEdit) {
+    // Forward cascade from row 0 so user edits propagate to all newer rows.
+    //
+    // The seed (oldSalary at row 0) is computed by reversing from currentSalary
+    // using DEFAULT %s and the DEFAULT level — not the edited values. This
+    // freezes the chain's starting point so edits at later rows shift the
+    // chain instead of being absorbed back into the seed. The anchor row's
+    // newSalary will drift from currentSalary by the amount of the edits;
+    // that's the desired "edits win" semantic.
+    let seedSalary = currentSalary;
+    for (let i = anchorIdx; i >= 0; i--) {
+      const monthsDiff =
+        (rounds[i].getFullYear() - snappedAssessment.getFullYear()) * 12 +
+        (rounds[i].getMonth() - snappedAssessment.getMonth());
+      const roundOffset = Math.round(monthsDiff / 6);
+      const increasesIdx = -roundOffset;
+      const seedPercent =
+        increasesIdx >= 0 && increasesIdx < increases.length
+          ? increases[increasesIdx]
+          : avgPercent;
+      seedSalary = reverseOldSalary(seedSalary, seedPercent, defaultBaseInfo);
     }
-  }
-
-  // Forward walk: rows newer than the anchor. Each row's oldSalary defaults
-  // to the previous (older) row's newSalary; newSalary computed forward.
-  {
-    let prevNew = slots[anchorIdx]!.newSalary;
-    for (let i = anchorIdx + 1; i < rounds.length; i++) {
-      const { newSalary } = forwardRow(i, prevNew);
+    let prevNew: number | null = null;
+    for (let i = 0; i < rounds.length; i++) {
+      const rowOld = prevNew !== null ? prevNew : seedSalary;
+      const { newSalary } = forwardRow(i, rowOld);
       prevNew = newSalary;
+    }
+  } else {
+    // Anchor-pin strategy (default). Compute the anchor row first so
+    // newSalary = currentSalary is locked in, then walk backward and forward
+    // independently.
+    {
+      const anchorCfg = getRowConfig(anchorIdx, rounds[anchorIdx]);
+      const ovNew = anchorCfg.override?.newSalary;
+      const ovOld = anchorCfg.override?.oldSalary;
+      const anchorNew =
+        ovNew != null && Number.isFinite(ovNew)
+          ? Math.min(ovNew, anchorCfg.rowBaseInfo.fullSalary)
+          : currentSalary;
+      const computedOld = reverseOldSalary(
+        anchorNew,
+        anchorCfg.percent,
+        anchorCfg.rowBaseInfo,
+      );
+      const anchorOld =
+        ovOld != null && Number.isFinite(ovOld) ? ovOld : computedOld;
+      const useBase = selectBaseForSalary(anchorOld, anchorCfg.rowBaseInfo);
+      slots[anchorIdx] = buildRecord(anchorCfg, anchorOld, anchorNew, useBase);
+    }
+
+    // Backward walk: rows older than the anchor. Each row's newSalary defaults
+    // to the next (newer) row's oldSalary; oldSalary derived via reverse.
+    {
+      let nextOld = slots[anchorIdx]!.oldSalary;
+      for (let i = anchorIdx - 1; i >= 0; i--) {
+        const { oldSalary } = backwardRow(i, nextOld);
+        nextOld = oldSalary;
+      }
+    }
+
+    // Forward walk: rows newer than the anchor. Each row's oldSalary defaults
+    // to the previous (older) row's newSalary; newSalary computed forward.
+    {
+      let prevNew = slots[anchorIdx]!.newSalary;
+      for (let i = anchorIdx + 1; i < rounds.length; i++) {
+        const { newSalary } = forwardRow(i, prevNew);
+        prevNew = newSalary;
+      }
     }
   }
 
