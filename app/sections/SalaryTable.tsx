@@ -132,6 +132,22 @@ export default function SalaryTableSection({
     if (editingIdx === idx) stopEdit();
   };
 
+  const clearAllOverrides = () => {
+    updateForm({ salaryOverrides: [] });
+    stopEdit();
+  };
+
+  const overriddenRowCount = form.salaryOverrides.reduce((n, ov) => {
+    if (!ov) return n;
+    const hasAny =
+      !!ov.level ||
+      !!ov.effectiveDate ||
+      ov.percent !== null ||
+      ov.oldSalary !== null ||
+      ov.newSalary !== null;
+    return hasAny ? n + 1 : n;
+  }, 0);
+
   const isGfp = form.mode === "gfp";
 
   // 60-month averaging window for GFP. Each row contributes its monthsInWindow
@@ -429,6 +445,25 @@ export default function SalaryTableSection({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Override banner — shows when user has pinned values; one click to clear all. */}
+      {overriddenRowCount > 0 && records.length > 0 && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
+          <div className="flex items-start gap-2 text-sm text-amber-800">
+            <span className="font-semibold">มีแถวที่ปักหมุดค่าไว้ {overriddenRowCount} แถว</span>
+            <span className="text-amber-700">— จะไม่เปลี่ยนตามค่าเฉลี่ย/ค่า default จาก Step ก่อนหน้า</span>
+          </div>
+          <button
+            type="button"
+            onClick={clearAllOverrides}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+            title="ล้างการแก้ไขทุกแถว — กลับไปใช้ค่าเฉลี่ย/ค่า default"
+          >
+            <RotateCcw size={14} />
+            ใช้ค่าเฉลี่ยทุกแถว
+          </button>
         </div>
       )}
 
