@@ -505,14 +505,19 @@ export function generateSalaryTable(
   //   %, see the chain update onward). The anchor row's newSalary may drift
   //   from currentSalary; that's the price of "edits win". Pinned newSalary
   //   overrides still win at any row.
+  // Only edits at rows STRICTLY EARLIER than the anchor trigger forward
+  // cascade. Edits AT the anchor row (level / percent / oldSalary / newSalary)
+  // are handled by the anchor-pin path: newSalary stays = currentSalary unless
+  // explicitly overridden via newSalary, while oldSalary / level / percent
+  // overrides reshape the anchor row's reverse-computed oldSalary in place.
   const hasPreAnchorEdit = overrides.some((o, i) => {
-    if (i > anchorIdx || !o) return false;
-    // Anchor row's newSalary override is the legitimate "override the anchor
-    // lock" case (PR #48 semantics) — keep using anchor-pin strategy. Edits
-    // at strictly earlier rows (including newSalary pins) should propagate
-    // forward via cascade.
-    if (i < anchorIdx && o.newSalary != null) return true;
-    return o.level != null || o.percent != null || o.oldSalary != null;
+    if (i >= anchorIdx || !o) return false;
+    return (
+      o.level != null ||
+      o.percent != null ||
+      o.oldSalary != null ||
+      o.newSalary != null
+    );
   });
 
   // Helpers compute one row's full record. forwardRow assumes oldSalary is
